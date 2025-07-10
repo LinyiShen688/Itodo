@@ -1,26 +1,875 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Noto+Serif+SC:wght@300;400&display=swap');
+@import "tailwindcss/preflight";
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --parchment: #f4e8d0;
+  --parchment-dark: #e8dcc4;
+  --ink-black: #2c2416;
+  --ink-brown: #5c4033;
+  --accent-gold: #d4a574;
+  --shadow-soft: rgba(92, 64, 51, 0.1);
+  --white-trans: rgba(255, 255, 255, 0.6);
+  
+  /* 四象限颜色 */
+  --urgent-important: #e74c3c;      /* 优雅的红色 */
+  --important-not-urgent: #3498db;  /* 沉稳的蓝色 */
+  --urgent-not-important: #27ae60;  /* 清新的绿色 */
+  --not-urgent-not-important: #95a5a6; /* 中性灰色 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Noto Serif SC', serif;
+  color: var(--ink-black);
+  min-height: 100vh;
+  background: var(--parchment);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 羊皮纸纹理背景 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(ellipse at top left, transparent 20%, var(--parchment-dark) 80%),
+    radial-gradient(ellipse at bottom right, transparent 20%, var(--parchment-dark) 80%),
+    linear-gradient(135deg, var(--parchment) 0%, var(--parchment-dark) 100%);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* 添加纸张纹理 */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(92, 64, 51, 0.02) 35px, rgba(92, 64, 51, 0.02) 70px),
+    repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(92, 64, 51, 0.02) 35px, rgba(92, 64, 51, 0.02) 70px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+
+.quadrant {
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.quadrant:nth-child(1) { animation-delay: 0.1s; }
+.quadrant:nth-child(2) { animation-delay: 0.2s; }
+.quadrant:nth-child(3) { animation-delay: 0.3s; }
+.quadrant:nth-child(4) { animation-delay: 0.4s; }
+
+/* Header 组件样式 */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(to bottom, var(--white-trans), transparent);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(212, 165, 116, 0.2);
+}
+
+.app-title {
+  font-family: 'Caveat', cursive;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--ink-brown);
+  text-shadow: 2px 2px 4px var(--shadow-soft);
+}
+
+.current-task-name {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.2rem;
+  color: var(--ink-brown);
+  margin-left: 2rem;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.pomodoro-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent-gold), var(--ink-brown));
+  border-radius: 50%;
+  position: relative;
+  margin-left: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px var(--shadow-soft);
+}
+
+.pomodoro-icon:hover {
+  transform: scale(1.15) rotate(10deg);
+  box-shadow: 0 4px 12px var(--shadow-soft);
+}
+
+.pomodoro-icon::before {
+  content: '🍅';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+}
+
+/* 主体网格 */
+.main-container {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+/* 四象限块 */
+.quadrant {
+  background: var(--white-trans);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px var(--shadow-soft);
+  min-height: 300px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.quadrant::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, transparent 30%, var(--parchment-dark) 70%);
+  opacity: 0.1;
+  transform: rotate(45deg);
+}
+
+.quadrant:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px var(--shadow-soft);
+}
+
+/* 重要且紧急 - 优雅突出 */
+.quadrant.first-quadrant {
+  background: 
+    linear-gradient(135deg, 
+      rgba(255, 252, 245, 0.9) 0%, 
+      rgba(244, 232, 208, 0.85) 50%,
+      rgba(255, 248, 235, 0.9) 100%);
+  border: 1px solid rgba(212, 165, 116, 0.4);
+  box-shadow: 
+    0 0 0 4px rgba(212, 165, 116, 0.08),
+    0 0 0 8px rgba(212, 165, 116, 0.04),
+    0 6px 20px rgba(212, 165, 116, 0.15),
+    0 12px 40px rgba(92, 64, 51, 0.1);
+  animation: gentleGlow 3s ease-in-out infinite;
+}
+
+.quadrant.first-quadrant:hover {
+  transform: translateY(-8px);
+  animation-play-state: paused;
+}
+
+/* 顶部装饰线 */
+.top-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0.4;
+}
+
+.quadrant.first-quadrant .top-accent {
+  height: 3px;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    var(--urgent-important) 20%,
+    var(--urgent-important) 80%,
+    transparent 100%);
+  opacity: 0.6;
+}
+
+.quadrant.second-quadrant .top-accent {
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    var(--important-not-urgent) 20%,
+    var(--important-not-urgent) 80%,
+    transparent 100%);
+}
+
+.quadrant.third-quadrant .top-accent {
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    var(--urgent-not-important) 20%,
+    var(--urgent-not-important) 80%,
+    transparent 100%);
+}
+
+/* 柔和的内发光 */
+.inner-glow {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border-radius: 0.8rem;
+  background: radial-gradient(ellipse at top left, 
+    rgba(212, 165, 116, 0.05) 0%,
+    transparent 40%);
+  pointer-events: none;
+}
+
+/* 优雅的角标 */
+.priority-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, var(--accent-gold), #c9a26e);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(212, 165, 116, 0.3);
+  letter-spacing: 0.5px;
+}
+
+/* 象限标题 */
+.quadrant-header {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.quadrant-title {
+  font-family: 'Caveat', cursive;
+  font-size: 1.8rem;
+  color: var(--ink-brown);
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: default;
+  flex: 0 0 auto;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.quadrant-title.editing {
+  background: var(--white-trans);
+  border: 2px solid var(--accent-gold);
+  cursor: text;
+}
+
+/* 重要且紧急标题特殊样式 */
+.quadrant.first-quadrant .quadrant-title {
+  color: var(--ink-brown);
+  font-weight: 700;
+  font-size: 2rem;
+  background: linear-gradient(135deg, var(--ink-brown), var(--accent-gold));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.edit-icon {
+  opacity: 0.3;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.7rem;
+  padding: 0.2rem;
+  margin-left: -0.3rem;
+}
+
+.quadrant-header:hover .edit-icon {
+  opacity: 0.7;
+}
+
+.edit-icon:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* 任务列表 */
+.task-list {
+  list-style: none;
+  position: relative;
+  z-index: 1;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 添加任务提示 */
+.add-task-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--ink-brown);
+  opacity: 0;
+  font-size: 0.9rem;
+  font-family: 'Caveat', cursive;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.task-list:not(:empty) ~ .add-task-hint {
+  top: auto;
+  bottom: 20px;
+  transform: translateX(-50%);
+}
+
+.quadrant:hover .add-task-hint {
+  opacity: 0.3;
+}
+
+.quadrant.first-quadrant .add-task-hint {
+  opacity: 0.25;
+}
+
+.quadrant.first-quadrant:hover .add-task-hint {
+  opacity: 0.4;
+}
+
+/* 任务条目样式 */
+.task-item {
+  background: var(--white-trans);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  padding-right: 4rem; /* 为拖拽手柄留出足够空间 */
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: default; /* 默认不是拖拽cursor */
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+}
+
+.task-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background: var(--accent-gold);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.task-item:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px var(--shadow-soft);
+}
+
+.task-item:hover::before {
+  opacity: 1;
+}
+
+.task-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.9);
+}
+
+/* 第一象限任务特殊样式 */
+.quadrant.first-quadrant .task-item {
+  background: rgba(255, 255, 255, 0.8);
+  border-left: 3px solid var(--accent-gold);
+  padding-left: 1.25rem;
+}
+
+.quadrant.first-quadrant .task-item:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-left-width: 4px;
+}
+
+/* 任务复选框 */
+.task-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ink-brown);
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.task-checkbox.checked {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+.task-checkbox.checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+}
+
+/* 任务文本 */
+.task-text {
+  flex: 1;
+  font-size: 1rem;
+  color: var(--ink-black);
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: text;
+  transition: all 0.3s ease;
+}
+.task-text.completed {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* 删除按钮 */
+.task-delete {
+  opacity: 0;
+  cursor: pointer;
+  color: var(--ink-brown);
+  transition: all 0.3s ease;
+  font-size: 1.2rem;
+  padding: 0 0.5rem;
+  margin-right: 45px; /* 调整以避免与拖拽手柄重叠 */
+}
+
+.task-item:hover .task-delete {
+  opacity: 0.6;
+}
+
+.task-delete:hover {
+  opacity: 1;
+  color: #e74c3c;
+  transform: scale(1.2);
+}
+
+/* 任务优先级圆点 */
+.task-priority-dot {
+  position: absolute;
+  right: 45px; /* 调整位置以避免与拖拽手柄重叠 */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 各象限的圆点颜色 */
+.quadrant.first-quadrant .task-priority-dot {
+  background: var(--urgent-important);
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+}
+
+.quadrant.second-quadrant .task-priority-dot {
+  background: var(--important-not-urgent);
+  box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+}
+
+.quadrant.third-quadrant .task-priority-dot {
+  background: var(--urgent-not-important);
+  box-shadow: 0 0 10px rgba(39, 174, 96, 0.3);
+}
+
+.quadrant.fourth-quadrant .task-priority-dot {
+  background: var(--not-urgent-not-important);
+  box-shadow: 0 0 10px rgba(149, 165, 166, 0.3);
+}
+
+/* 悬浮时圆点效果 */
+.task-item:hover .task-priority-dot {
+  transform: translateY(-50%) scale(1.3);
+}
+
+/* 完成状态的圆点变淡 */
+.task-text.completed ~ .task-priority-dot {
+  opacity: 0.3;
+}
+
+/* 拖拽手柄样式 */
+.task-drag-handle {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--ink-brown);
+  opacity: 0;
+  cursor: grab;
+  transition: all 0.3s ease;
+  user-select: none;
+  z-index: 10;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.task-drag-handle:active {
+  cursor: grabbing;
+}
+
+.task-item:hover .task-drag-handle {
+  opacity: 0.6;
+}
+
+.task-drag-handle:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+  background: rgba(212, 165, 116, 0.3);
+}
+
+/* 拖拽占位符 */
+.drag-placeholder {
+  border: 2px dashed var(--accent-gold);
+  background: rgba(212, 165, 116, 0.1);
+  border-radius: 0.75rem;
+  height: 60px;
+  margin-bottom: 0.75rem;
+}
+
+/* 拖拽悬浮效果 */
+.task-list.drag-over {
+  background: rgba(212, 165, 116, 0.05);
+  border-radius: 0.75rem;
+  border: 2px dashed var(--accent-gold);
+}
+
+.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  z-index: 1000;
+}
+
+/* 侧边栏样式 */
+.sidebar {
+  position: fixed;
+  left: -300px;
+  top: 0;
+  width: 300px;
+  height: 100vh;
+  background: var(--white-trans);
+  backdrop-filter: blur(20px);
+  box-shadow: 4px 0 20px var(--shadow-soft);
+  z-index: 200;
+  transition: left 0.3s ease;
+  overflow-y: auto;
+  padding: 2rem 1.5rem;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+/* 关闭按钮 */
+.sidebar-close {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--ink-brown);
+  transition: transform 0.3s ease;
+}
+
+.sidebar-close:hover {
+  transform: rotate(90deg);
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--accent-gold);
+  color: var(--ink-black);
+  border: none;
+  width: 48px;
+  height: 120px;
+  border-radius: 0 24px 24px 0;
+  cursor: pointer;
+  z-index: 199;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 2px 0 10px var(--shadow-soft);
+  font-family: 'Caveat', cursive;
+  font-size: 1.2rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.sidebar-toggle:hover {
+  width: 56px;
+  box-shadow: 4px 0 15px var(--shadow-soft);
+}
+
+.sidebar-toggle::before {
+  content: '📋';
+  font-size: 1.5rem;
+  writing-mode: initial;
+}
+
+/* 侧边栏打开时的切换按钮样式 */
+.sidebar.open ~ .sidebar-toggle {
+  left: 300px;
+  background: var(--ink-brown);
+  color: white;
+  border-radius: 24px 0 0 24px;
+}
+
+.sidebar.open ~ .sidebar-toggle::before {
+  content: '◀';
+  font-size: 1.2rem;
+}
+
+.sidebar.open ~ .sidebar-toggle span {
+  display: none;
+}
+
+/* 侧边栏标题 */
+.sidebar h2 {
+  font-family: 'Caveat', cursive;
+  font-size: 1.5rem;
+  color: var(--ink-brown);
+  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+}
+
+.sidebar h2:first-child {
+  margin-top: 0;
+}
+
+/* 侧边栏任务列表 */
+.sidebar-tasks {
+  margin-top: 0.5rem;
+}
+
+.sidebar-item {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  background: var(--white-trans);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-item:hover {
+  background: var(--parchment-dark);
+  transform: translateX(5px);
+}
+
+.sidebar-item.active {
+  background: var(--accent-gold);
+  color: white;
+}
+
+.sidebar-item.editable {
+  cursor: text;
+}
+
+.sidebar-item input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.sidebar-item-text {
+  flex: 1;
+  cursor: pointer;
+}
+
+.sidebar-item-delete {
+  opacity: 0;
+  cursor: pointer;
+  color: var(--ink-brown);
+  transition: all 0.3s ease;
+  font-size: 1.2rem;
+  padding: 0 0.3rem;
+}
+
+.sidebar-item:hover .sidebar-item-delete {
+  opacity: 0.6;
+}
+
+.sidebar-item-delete:hover {
+  opacity: 1;
+  color: #e74c3c;
+}
+
+.create-task-btn {
+  background: var(--accent-gold);
+  color: white;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-weight: 500;
+}
+
+.create-task-btn:hover {
+  background: var(--ink-brown);
+}
+
+/* 主题选择器 */
+.theme-selector {
+  margin-top: 1rem;
+}
+
+.theme-selector select {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--white-trans);
+  border: 1px solid var(--ink-brown);
+  border-radius: 0.5rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* 移动端浮动按钮 */
+.fab {
+  display: none;
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 60px;
+  height: 60px;
+  background: var(--accent-gold);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 2rem;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(212, 165, 116, 0.4);
+  z-index: 101;
+  transition: all 0.3s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.fab:hover {
+  transform: scale(1.1) rotate(90deg);
+}
+
+
+/* 响应式设计 */
+@media (min-width: 768px) {
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  
+  .fab {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .add-task-btn {
+    display: none;
+  }
+  
+  .fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  header {
+    padding: 1rem 1.5rem;
+  }
+  
+  .app-title {
+    font-size: 2rem;
+  }
+  
+  .main-container {
+    padding: 1rem;
+  }
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 第一象限的呼吸动画 */
+@keyframes gentleGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 0 4px rgba(212, 165, 116, 0.08),
+      0 0 0 8px rgba(212, 165, 116, 0.04),
+      0 6px 20px rgba(212, 165, 116, 0.15),
+      0 12px 40px rgba(92, 64, 51, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 0 5px rgba(212, 165, 116, 0.12),
+      0 0 0 10px rgba(212, 165, 116, 0.06),
+      0 8px 25px rgba(212, 165, 116, 0.2),
+      0 15px 45px rgba(92, 64, 51, 0.12);
+  }
 }
