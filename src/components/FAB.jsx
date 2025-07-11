@@ -17,7 +17,11 @@ export default function FAB() {
   };
 
   return (
-    <button className="fab" onClick={handleAddTask}>
+    <button
+      onClick={handleAddTask}
+      title="添加任务"
+      className="fixed bottom-8 right-8 z-[101] flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[var(--accent-gold)] text-2xl text-white shadow-[0_4px_20px_rgba(212,165,116,0.4)] transition-transform duration-300 ease-in-out hover:rotate-90 hover:scale-110 md:hidden"
+    >
       ＋
     </button>
   );

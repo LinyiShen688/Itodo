@@ -115,6 +115,8 @@ export default function Sidebar() {
   const handleSetActiveList = async (list) => {
     try {
       await setActiveList(list.id);
+      // 关闭侧边栏
+      setIsOpen(false);
     } catch (error) {
       console.error('Failed to set active list:', error);
     }

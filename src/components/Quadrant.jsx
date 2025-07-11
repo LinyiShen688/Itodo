@@ -95,10 +95,16 @@ export default function Quadrant({
       {/* 内发光效果 */}
       <div className="inner-glow"></div>
       
-      {/* 第一象限的优先徽章 */}
-      {isFirst && (
-        <span className="priority-badge">立即做</span>
-      )}
+      {/* 各象限的优先徽章 */}
+      {(() => {
+        const badgeMap = {
+          1: '立即做',
+          2: '计划做',
+          3: '外包做',
+          4: '不做'
+        };
+        return <span className="priority-badge">{badgeMap[quadrantId]}</span>;
+      })()}
       
       {/* 象限标题区域 */}
       <div className="quadrant-header">

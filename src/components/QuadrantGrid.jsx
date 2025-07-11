@@ -116,9 +116,9 @@ export default function QuadrantGrid() {
 
   if (loading) {
     return (
-      <main className="main-container">
-        <div className="grid-container">
-          <div className="text-center py-8 text-[var(--ink-brown)]">
+      <main className="mx-auto px-4 py-4 md:p-8 max-w-[1400px]">
+        <div className="grid gap-6">
+          <div className="py-8 text-center text-[var(--ink-brown)]">
             加载中...
           </div>
         </div>
@@ -128,9 +128,9 @@ export default function QuadrantGrid() {
 
   if (error) {
     return (
-      <main className="main-container">
-        <div className="grid-container">
-          <div className="text-center py-8 text-red-500">
+      <main className="mx-auto px-4 py-4 md:p-8 max-w-[1400px]">
+        <div className="grid gap-6">
+          <div className="py-8 text-center text-red-500">
             错误: {error}
           </div>
         </div>
@@ -140,8 +140,8 @@ export default function QuadrantGrid() {
 
   return (
     <DragContext onDragEnd={handleDragEnd}>
-      <main className="main-container">
-        <div className="grid-container grid-cols-2 grid-rows-2">
+      <main className="mx-auto">
+        <div className="grid grid-cols-1 gap-6  p-6 md:grid-cols-2 md:grid-rows-2 md:justify-center">
           {QUADRANT_CONFIG.map((config) => (
             <Quadrant
               key={config.id}

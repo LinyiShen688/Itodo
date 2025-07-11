@@ -32,7 +32,7 @@ export default function DraggableTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={isDragging ? 'dragging' : ''}
+      className={isDragging ? 'transition-transform duration-150 ease-in-out' : ''}
       {...attributes}
     >
       <TaskItem

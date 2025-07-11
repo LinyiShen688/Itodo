@@ -12,12 +12,14 @@ export default function TaskItem({
   dragListeners,
   setActivatorNodeRef
 }) {
-  const [isEditing, setIsEditing] = useState(false);
+  // 空白任务自动进入编辑模式
+  const [isEditing, setIsEditing] = useState(task.text.trim() === '');
   const [currentText, setCurrentText] = useState(task.text);
   const textInputRef = useRef(null);
 
-  // 处理文本编辑
-  const handleTextClick = () => {
+  // 开始编辑（由铅笔按钮触发）
+  const handleStartEdit = (e) => {
+    e?.stopPropagation();
     if (!task.completed && !isEditing) {
       setIsEditing(true);
     }
@@ -25,6 +27,11 @@ export default function TaskItem({
 
   const handleTextChange = (e) => {
     setCurrentText(e.target.value);
+    // 自动高度
+    if (textInputRef.current) {
+      textInputRef.current.style.height = 'auto';
+      textInputRef.current.style.height = textInputRef.current.scrollHeight + 'px';
+    }
   };
 
   const handleTextSubmit = async () => {
@@ -39,8 +46,10 @@ export default function TaskItem({
     setIsEditing(false);
   };
 
+  // Enter 提交（Shift+Enter 换行），Esc 取消
   const handleTextKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleTextSubmit();
     } else if (e.key === 'Escape') {
       setCurrentText(task.text);
@@ -56,6 +65,9 @@ export default function TaskItem({
   useEffect(() => {
     if (isEditing && textInputRef.current) {
       textInputRef.current.focus();
+      // 初次进入时调整高度
+      textInputRef.current.style.height = 'auto';
+      textInputRef.current.style.height = textInputRef.current.scrollHeight + 'px';
     }
   }, [isEditing]);
 
@@ -84,14 +96,9 @@ export default function TaskItem({
     }
   };
 
-  // 阻止输入框的拖拽事件
+  // 阻止 textarea 与拖拽冲突
   const handleInputMouseDown = (e) => {
     e.stopPropagation();
-  };
-
-  const handleInputClick = (e) => {
-    e.stopPropagation(); // 阻止拖拽事件
-    handleTextClick(); // 触发编辑
   };
 
   return (
@@ -106,20 +113,29 @@ export default function TaskItem({
         onClick={handleCheckboxClick}
       ></div>
       
-      {/* 任务文本 */}
-      <input
+      {/* 任务文本（textarea 可自动换行） */}
+      <textarea
         ref={textInputRef}
-        type="text"
         className={`task-text ${task.completed ? 'completed' : ''}`}
         value={isEditing ? currentText : task.text}
         onChange={handleTextChange}
         onKeyDown={handleTextKeyDown}
         onBlur={handleTextBlur}
-        onClick={handleInputClick}
         onMouseDown={handleInputMouseDown}
         readOnly={!isEditing || task.completed}
         placeholder="输入任务..."
+        rows={1}
       />
+
+      {/* 铅笔编辑按钮 */}
+      {(!isEditing && !task.completed) && (
+        <span
+          className="task-edit"
+          onClick={handleStartEdit}
+        >
+          ✎
+        </span>
+      )}
       
       {/* 删除按钮 */}
       <span 

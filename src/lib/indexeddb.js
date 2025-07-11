@@ -330,7 +330,7 @@ export async function deleteTaskList(id) {
   await tx.objectStore(STORES.TASK_LISTS).delete(id);
   
   // 删除该列表下的所有任务
-  const tasks = await tx.objectStore(STORES.TASKS).getAllFromIndex('listId', id);
+  const tasks = await tx.objectStore(STORES.TASKS).index('listId').getAll(id);
   for (const task of tasks) {
     await tx.objectStore(STORES.TASKS).delete(task.id);
   }

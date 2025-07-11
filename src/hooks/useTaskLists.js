@@ -93,6 +93,11 @@ export function useTaskLists() {
       );
       
       setActiveList(newActiveList);
+
+      // 通知其他组件活动列表已变更
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('task-list-changed'));
+      }
       return newActiveList;
     } catch (err) {
       console.error('Failed to set active task list:', err);
@@ -121,12 +126,30 @@ export function useTaskLists() {
           setActiveList(null);
         }
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('task-list-changed'));
+      }
     } catch (err) {
       console.error('Failed to delete task list:', err);
       setError(err.message);
       throw err;
     }
   }, [activeList, taskLists, handleSetActiveList]);
+
+  // 监听全局事件，跨组件同步
+  useEffect(() => {
+    const handler = () => {
+      loadTaskLists();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('task-list-changed', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('task-list-changed', handler);
+      }
+    };
+  }, [loadTaskLists]);
 
   // 根据ID获取任务列表
   const getTaskListById = useCallback((id) => {

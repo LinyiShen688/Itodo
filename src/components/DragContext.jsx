@@ -66,7 +66,9 @@ export default function DragContext({ children, onDragEnd }) {
       {children}
       <DragOverlay>
         {activeId ? (
-          <div className="task-item dragging">
+          <div
+            className="pointer-events-none select-none rounded-xl bg-[rgba(255,255,255,0.8)] px-4 py-3 text-sm text-[var(--ink-black)] shadow-lg opacity-50 transform scale-95"
+          >
             正在拖拽...
           </div>
         ) : null}
