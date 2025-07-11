@@ -18,6 +18,7 @@ export default function Quadrant({
   tooltip,
   isFirst,
   tasks,
+  isLoading = false,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -81,13 +82,12 @@ export default function Quadrant({
     }
   };
 
-  const quadrantClass = `quadrant ${QUADRANT_CLASSES[quadrantId]}`;
+  const quadrantClass = `quadrant ${QUADRANT_CLASSES[quadrantId]} ${isLoading ? 'loading' : ''}`;
   
   return (
     <div 
       className={quadrantClass} 
       onClick={handleQuadrantClick}
-      style={{ animation: `fadeIn 0.6s ease forwards`, animationDelay: `${quadrantId * 0.1}s` }}
     >
       {/* 顶部装饰线 */}
       <div className="top-accent"></div>

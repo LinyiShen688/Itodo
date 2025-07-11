@@ -65,14 +65,21 @@ body::after {
 }
 
 
+/* 象限容器平滑过渡 */
 .quadrant {
-  animation: fadeIn 0.6s ease forwards;
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
 
-.quadrant:nth-child(1) { animation-delay: 0.1s; }
-.quadrant:nth-child(2) { animation-delay: 0.2s; }
-.quadrant:nth-child(3) { animation-delay: 0.3s; }
-.quadrant:nth-child(4) { animation-delay: 0.4s; }
+/* 加载状态时的过渡效果 */
+.quadrant.loading {
+  opacity: 0.7;
+}
+
+/* 任务列表平滑过渡 */
+.task-list {
+  transition: all 0.2s ease-in-out;
+}
 
 /* Header 组件样式 */
 header {
@@ -327,12 +334,8 @@ header {
 
 /* 添加任务提示 */
 .add-task-hint {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   color: var(--ink-brown);
-  opacity: 0;
+  opacity: 0.15;
   font-size: 0.9rem;
   font-family: 'Caveat', cursive;
   pointer-events: none;
@@ -341,13 +344,7 @@ header {
   white-space: nowrap;
 }
 
-.task-list:not(:empty) ~ .add-task-hint {
-  top: auto;
-  bottom: 20px;
-  transform: translateX(-50%);
-}
-
-.quadrant:hover .add-task-hint {
+.add-task-area:hover .add-task-hint {
   opacity: 0.3;
 }
 
@@ -355,7 +352,7 @@ header {
   opacity: 0.25;
 }
 
-.quadrant.first-quadrant:hover .add-task-hint {
+.quadrant.first-quadrant .add-task-area:hover .add-task-hint {
   opacity: 0.4;
 }
 

@@ -20,11 +20,19 @@ export function useTasks(listId = 'today') {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentListId, setCurrentListId] = useState(listId);
 
   // 加载任务
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (forceLoading = false) => {
     try {
-      setLoading(true);
+      // 检查是否需要显示loading状态
+      const isEmptyTasks = !tasks[1].length && !tasks[2].length && !tasks[3].length && !tasks[4].length;
+      const isListChanged = currentListId !== listId;
+      
+      if (forceLoading || isEmptyTasks || isListChanged) {
+        setLoading(true);
+      }
+      
       setError(null);
       
       const allTasks = await getAllTasks(listId);
@@ -42,18 +50,26 @@ export function useTasks(listId = 'today') {
       });
       
       setTasks(groupedTasks);
+      setCurrentListId(listId);
     } catch (err) {
       console.error('Failed to load tasks:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [listId]);
+  }, [listId, currentListId]);
 
   // 初始加载
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  // 监听listId变化
+  useEffect(() => {
+    if (listId !== currentListId) {
+      loadTasks();
+    }
+  }, [listId, currentListId, loadTasks]);
 
   // 添加新任务
   const handleAddTask = useCallback(async (quadrant, text = '') => {

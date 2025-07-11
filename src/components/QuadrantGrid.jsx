@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Quadrant from './Quadrant';
 import DragContext from './DragContext';
 import { useTasks } from '@/hooks/useTasks';
@@ -32,6 +33,19 @@ const QUADRANT_CONFIG = [
     isFirst: false
   }
 ];
+
+// 记忆化Quadrant组件以避免不必要的重渲染
+const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
+  // 只有当关键属性发生变化时才重新渲染
+  return (
+    prevProps.quadrantId === nextProps.quadrantId &&
+    prevProps.title === nextProps.title &&
+    prevProps.tooltip === nextProps.tooltip &&
+    prevProps.isFirst === nextProps.isFirst &&
+    prevProps.isLoading === nextProps.isLoading &&
+    JSON.stringify(prevProps.tasks) === JSON.stringify(nextProps.tasks)
+  );
+});
 
 export default function QuadrantGrid() {
   const { activeList } = useTaskLists();
@@ -114,17 +128,7 @@ export default function QuadrantGrid() {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="mx-auto px-4 py-4 md:p-8 max-w-[1400px]">
-        <div className="grid gap-6">
-          <div className="py-8 text-center text-[var(--ink-brown)]">
-            加载中...
-          </div>
-        </div>
-      </main>
-    );
-  }
+  // 移除全局loading状态，改为在数据为空时显示skeleton
 
   if (error) {
     return (
@@ -143,13 +147,14 @@ export default function QuadrantGrid() {
       <main className="mx-auto">
         <div className="grid grid-cols-1 gap-6  p-6 md:grid-cols-2 md:grid-rows-2 md:justify-center">
           {QUADRANT_CONFIG.map((config) => (
-            <Quadrant
+            <MemoizedQuadrant
               key={config.id}
               quadrantId={config.id}
               title={config.title}
               tooltip={config.tooltip}
               isFirst={config.isFirst}
               tasks={tasks[config.id] || []}
+              isLoading={loading}
               onAddTask={(text) => addTask(config.id, text)}
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
