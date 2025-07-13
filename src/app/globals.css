@@ -21,6 +21,27 @@
   --texture-color: rgba(92, 64, 51, 0.02);
 }
 
+/* 简约主题 - Apple级别设计美感 */
+[data-theme="minimal"] {
+  --parchment: #fcf5e9;           /* 温暖的米白背景 */
+  --parchment-dark: #f7ede0;     /* 稍深的米白 */
+  --ink-black: #1d1d1f;          /* Apple经典深灰 */
+  --ink-brown: #424245;          /* 中性灰色文字 */
+  --accent-gold: #5D4E37;        /* 深咖啡色强调 */
+  --shadow-soft: rgba(29, 29, 31, 0.04);
+  --white-trans: rgba(254, 251, 246, 0.85);
+  --texture-color: rgba(29, 29, 31, 0.015);
+  
+  /* 四象限专用背景 */
+  --quadrant-bg: #fefbf6;
+  
+  /* 四象限颜色 - 更现代化的配色 */
+  --urgent-important: #ff3b30;      /* Apple红色 */
+  --important-not-urgent: #6B6B6B;  /* 温暖灰色 */
+  --urgent-not-important: #34c759;  /* Apple绿色 */
+  --not-urgent-not-important: #8e8e93; /* Apple灰色 */
+}
+
 /* 墨水深蓝主题 */
 [data-theme="dark-blue"] {
   --parchment: #0f172a;           /* 深蓝背景 */
@@ -93,9 +114,6 @@ body::after {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: 
-    repeating-linear-gradient(45deg, transparent, transparent 35px, var(--texture-color) 35px, var(--texture-color) 70px),
-    repeating-linear-gradient(-45deg, transparent, transparent 35px, var(--texture-color) 35px, var(--texture-color) 70px);
   pointer-events: none;
   z-index: -1;
 }
@@ -174,6 +192,27 @@ header {
   font-size: 20px;
 }
 
+/* 简约主题的Header样式 */
+[data-theme="minimal"] header {
+  background: rgba(252, 245, 233, 0.8);
+  backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(29, 29, 31, 0.06);
+  box-shadow: 0 1px 0 rgba(29, 29, 31, 0.04);
+}
+
+[data-theme="minimal"] .app-title {
+  color: var(--ink-black);
+  font-weight: 600;
+  text-shadow: none;
+  letter-spacing: -0.5px;
+}
+
+[data-theme="minimal"] .current-task-name {
+  color: var(--ink-brown);
+  font-weight: 400;
+  opacity: 0.8;
+}
+
 /* 主体网格 */
 .main-container {
   padding: 2rem;
@@ -234,55 +273,40 @@ header {
   animation-play-state: paused;
 }
 
-/* 顶部装饰线 */
-.top-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  opacity: 0.4;
+/* 简约主题的象限样式 */
+[data-theme="minimal"] .quadrant {
+  background: var(--quadrant-bg);
+  backdrop-filter: none;
+  border: 1px solid rgba(29, 29, 31, 0.06);
+  box-shadow: 0 1px 3px rgba(29, 29, 31, 0.04), 0 1px 2px rgba(29, 29, 31, 0.06);
 }
 
-.quadrant.first-quadrant .top-accent {
-  height: 3px;
-  background: linear-gradient(90deg, 
-    transparent 0%,
-    var(--urgent-important) 20%,
-    var(--urgent-important) 80%,
-    transparent 100%);
-  opacity: 0.6;
+[data-theme="minimal"] .quadrant:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(29, 29, 31, 0.08), 0 2px 4px rgba(29, 29, 31, 0.06);
 }
 
-.quadrant.second-quadrant .top-accent {
-  background: linear-gradient(90deg, 
-    transparent 0%,
-    var(--important-not-urgent) 20%,
-    var(--important-not-urgent) 80%,
-    transparent 100%);
+[data-theme="minimal"] .quadrant.first-quadrant {
+  background: var(--quadrant-bg);
+  border: 1px solid rgba(93, 78, 55, 0.12);
+  box-shadow: 
+    0 0 0 1px rgba(93, 78, 55, 0.04),
+    0 2px 8px rgba(93, 78, 55, 0.08),
+    0 4px 16px rgba(29, 29, 31, 0.04);
+  animation: none;
 }
 
-.quadrant.third-quadrant .top-accent {
-  background: linear-gradient(90deg, 
-    transparent 0%,
-    var(--urgent-not-important) 20%,
-    var(--urgent-not-important) 80%,
-    transparent 100%);
+[data-theme="minimal"] .quadrant.first-quadrant:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 0 0 1px rgba(93, 78, 55, 0.08),
+    0 4px 16px rgba(93, 78, 55, 0.12),
+    0 8px 32px rgba(29, 29, 31, 0.06);
 }
 
-/* 柔和的内发光 */
-.inner-glow {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  border-radius: 0.8rem;
-  background: radial-gradient(ellipse at top left, 
-    rgba(212, 165, 116, 0.05) 0%,
-    transparent 40%);
-  pointer-events: none;
-}
+
+
+
 
 /* 优雅的角标 */
 .priority-badge {
@@ -451,6 +475,44 @@ body.dragging-active {
 .quadrant.first-quadrant .task-item:hover {
   background: rgba(255, 255, 255, 0.95);
   border-left-width: 4px;
+}
+
+/* 简约主题的任务项样式 */
+[data-theme="minimal"] .task-item {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(29, 29, 31, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(29, 29, 31, 0.04);
+  backdrop-filter: blur(20px);
+}
+
+[data-theme="minimal"] .task-item:hover {
+  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(29, 29, 31, 0.08);
+  box-shadow: 0 2px 8px rgba(29, 29, 31, 0.08);
+}
+
+[data-theme="minimal"] .task-item::before {
+  background: var(--accent-gold);
+  width: 2px;
+  opacity: 0;
+}
+
+[data-theme="minimal"] .task-item:hover::before {
+  opacity: 1;
+}
+
+[data-theme="minimal"] .quadrant.first-quadrant .task-item {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(93, 78, 55, 0.08);
+  border-left: 2px solid var(--accent-gold);
+}
+
+[data-theme="minimal"] .quadrant.first-quadrant .task-item:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-left-width: 3px;
+  transform: translateX(3px);
 }
 
 /* 任务复选框 */
@@ -796,6 +858,46 @@ body.dragging-active {
 
 .sidebar.open {
   left: 0;
+}
+
+/* 简约主题的侧边栏样式 */
+[data-theme="minimal"] .sidebar {
+  background: rgba(252, 245, 233, 0.95);
+  backdrop-filter: blur(40px);
+  border-right: 1px solid rgba(29, 29, 31, 0.06);
+  box-shadow: 0 0 0 1px rgba(29, 29, 31, 0.04), 4px 0 32px rgba(29, 29, 31, 0.08);
+}
+
+[data-theme="minimal"] .sidebar-item {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(29, 29, 31, 0.04);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+[data-theme="minimal"] .sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(29, 29, 31, 0.08);
+  transform: translateX(2px);
+}
+
+[data-theme="minimal"] .sidebar-item.active {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+  color: white;
+}
+
+[data-theme="minimal"] .create-task-btn {
+  background: var(--accent-gold);
+  border: none;
+  color: white;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="minimal"] .create-task-btn:hover {
+  background: #4A3E2A;
+  transform: translateX(2px);
 }
 
 /* 关闭按钮 */

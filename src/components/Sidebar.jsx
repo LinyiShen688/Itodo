@@ -6,6 +6,7 @@ import { useSidebarState } from '@/hooks/useSidebarState';
 import { useTheme } from '@/hooks/useTheme';
 
 const THEME_OPTIONS = [
+  { value: 'minimal', label: '简约' },
   { value: 'parchment', label: '羊皮纸经典' },
   { value: 'dark-blue', label: '墨水深蓝' },
   { value: 'forest-green', label: '森林绿意' },

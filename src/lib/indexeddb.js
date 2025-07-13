@@ -11,7 +11,7 @@ const STORES = {
 // 数据库初始化
 export async function initDB() {
   const db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
+    upgrade(db, oldVersion, newVersion, transaction) {
       // 任务存储
       if (!db.objectStoreNames.contains(STORES.TASKS)) {
         const taskStore = db.createObjectStore(STORES.TASKS, {
@@ -33,9 +33,8 @@ export async function initDB() {
       }
 
       // 版本升级处理
-      if (oldVersion < 2) {
+      if (oldVersion < 2 && db.objectStoreNames.contains(STORES.TASKS)) {
         // 为现有任务添加 estimatedTime 字段
-        const transaction = db.transaction;
         const taskStore = transaction.objectStore(STORES.TASKS);
         
         // 使用cursor遍历所有任务

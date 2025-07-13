@@ -11,7 +11,7 @@ export default function Header({ currentTaskName = "今日待办" }) {
           className="text-[2.5rem] font-bold text-[var(--ink-brown)]"
           style={{ fontFamily: "'Caveat', cursive", textShadow: "2px 2px 4px var(--shadow-soft)" }}
         >
-          墨迹清单
+          Itodo
         </h1>
         <span
           className="ml-8 text-[1.2rem] italic opacity-80 text-[var(--ink-brown)]"

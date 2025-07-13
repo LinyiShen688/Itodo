@@ -89,11 +89,6 @@ export default function Quadrant({
       className={quadrantClass} 
       onClick={handleQuadrantClick}
     >
-      {/* 顶部装饰线 */}
-      <div className="top-accent"></div>
-      
-      {/* 内发光效果 */}
-      <div className="inner-glow"></div>
       
       {/* 各象限的优先徽章 */}
       {(() => {
