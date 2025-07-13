@@ -230,8 +230,10 @@ export default function TaskItem({
         ×
       </span>
       
-      {/* 优先级圆点 */}
-      <span className="task-priority-dot"></span>
+      {/* 优先级圆点 - 仅重要任务显示 */}
+      {(quadrantId === 1 || quadrantId === 2) && (
+        <span className="task-priority-dot"></span>
+      )}
     </div>
   );
 } 
