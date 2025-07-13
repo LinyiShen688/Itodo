@@ -33,6 +33,7 @@ export default function DragContext({ children, onDragEnd }) {
 
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
+    document.body.classList.add('dragging-active');
   };
 
   const handleDragEnd = (event) => {
@@ -49,10 +50,12 @@ export default function DragContext({ children, onDragEnd }) {
     }
     
     setActiveId(null);
+    document.body.classList.remove('dragging-active');
   };
 
   const handleDragCancel = () => {
     setActiveId(null);
+    document.body.classList.remove('dragging-active');
   };
 
   return (

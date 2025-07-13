@@ -240,7 +240,7 @@ export default function Sidebar() {
 
       {/* 侧边栏切换按钮 */}
       <button className="sidebar-toggle" onClick={toggleSidebar}>
-        <span>任务</span>
+        {/* <span>任务</span> */}
       </button>
     </>
   );

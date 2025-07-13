@@ -16,6 +16,7 @@ export default function TaskItem({
   const [isEditing, setIsEditing] = useState(task.text.trim() === '');
   const [currentText, setCurrentText] = useState(task.text);
   const [currentEstimatedTime, setCurrentEstimatedTime] = useState(task.estimatedTime || '');
+  const [showEditOptions, setShowEditOptions] = useState(task.text.trim() !== ''); // 有内容时默认显示
   const textInputRef = useRef(null);
   const timeInputRef = useRef(null);
 
@@ -24,11 +25,19 @@ export default function TaskItem({
     e?.stopPropagation();
     if (!task.completed && !isEditing) {
       setIsEditing(true);
+      setShowEditOptions(true); // 点击编辑按钮直接显示选项
     }
   };
 
   const handleTextChange = (e) => {
-    setCurrentText(e.target.value);
+    const newText = e.target.value;
+    setCurrentText(newText);
+    
+    // 第一个字符输入时显示编辑选项
+    if (!showEditOptions && newText.trim().length > 0) {
+      setShowEditOptions(true);
+    }
+    
     // 自动高度
     if (textInputRef.current) {
       textInputRef.current.style.height = 'auto';
@@ -59,6 +68,7 @@ export default function TaskItem({
   const handleCancel = () => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
+    setShowEditOptions(task.text.trim() !== ''); // 重置显示状态
     setIsEditing(false);
   };
 
@@ -95,6 +105,7 @@ export default function TaskItem({
   useEffect(() => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
+    setShowEditOptions(task.text.trim() !== ''); // 同步显示状态
   }, [task.text, task.estimatedTime]);
 
   // 处理复选框点击
@@ -135,59 +146,68 @@ export default function TaskItem({
       ></div>
       
       <div className="task-content">
-        {/* 任务文本（textarea 可自动换行） */}
-        <textarea
-          ref={textInputRef}
-          className={`task-text ${task.completed ? 'completed' : ''}`}
-          value={isEditing ? currentText : task.text}
-          onChange={handleTextChange}
-          onKeyDown={handleTextKeyDown}
-          onBlur={isEditing ? undefined : handleTextBlur}
-          onMouseDown={handleInputMouseDown}
-          readOnly={!isEditing || task.completed}
-          placeholder="输入任务..."
-          rows={1}
-        />
-
-        {/* 预计时间显示/输入 */}
-        {isEditing ? (
-          <div className="task-time-editor">
-            <label className="task-time-label">预计时间：</label>
-            <input
-              ref={timeInputRef}
-              type="text"
-              className="task-time-input"
-              value={currentEstimatedTime}
-              onChange={handleTimeChange}
+        {/* 任务主内容行：textarea 与时间 badge 并排 */}
+        <div className="task-main-line flex items-center flex-wrap gap-2">
+          {isEditing ? (
+            <textarea
+              ref={textInputRef}
+              className={`task-text ${task.completed ? 'completed' : ''}`}
+              value={currentText}
+              onChange={handleTextChange}
+              onKeyDown={handleTextKeyDown}
+              onBlur={undefined}
               onMouseDown={handleInputMouseDown}
-              placeholder="如：30分钟、2小时"
+              placeholder="输入任务..."
+              rows={1}
             />
-          </div>
-        ) : (
-          task.estimatedTime && (
-            <div className="task-time-display">
-              {task.estimatedTime}
+          ) : (
+            <div
+              className={`task-text ${task.completed ? 'completed' : ''}`}
+              onMouseDown={handleInputMouseDown}
+            >
+              {task.text || ' '}
             </div>
-          )
-        )}
+          )}
 
-        {/* 编辑模式的按钮栏 */}
+          {/* 非编辑状态下显示时间 badge */}
+          {!isEditing && task.estimatedTime && (
+            <span className="task-time-badge">{task.estimatedTime}</span>
+          )}
+        </div>
+
+        {/* 编辑模式的扩展区域 */}
         {isEditing && (
-          <div className="task-edit-actions">
-            <button
-              className="task-cancel-btn"
-              onClick={handleCancel}
-              onMouseDown={handleInputMouseDown}
-            >
-              取消
-            </button>
-            <button
-              className="task-confirm-btn"
-              onClick={handleTextSubmit}
-              onMouseDown={handleInputMouseDown}
-            >
-              确认
-            </button>
+          <div className={`task-edit-expansion ${showEditOptions ? 'show' : ''}`}>
+            <div className="task-time-editor">
+              <textarea
+                ref={timeInputRef}
+                className="task-time-input"
+                value={currentEstimatedTime}
+                onChange={handleTimeChange}
+                onKeyDown={handleTextKeyDown}
+                onMouseDown={handleInputMouseDown}
+                placeholder="预计时间，如30分钟、2小时"
+                rows={1}
+              />
+            </div>
+
+            {/* 编辑模式的按钮栏 */}
+            <div className="flex gap-2 pt-2">
+              <button
+                className="task-cancel-btn"
+                onClick={handleCancel}
+                onMouseDown={handleInputMouseDown}
+              >
+                取消
+              </button>
+              <button
+                className="task-confirm-btn"
+                onClick={handleTextSubmit}
+                onMouseDown={handleInputMouseDown}
+              >
+                确认
+              </button>
+            </div>
           </div>
         )}
       </div>
