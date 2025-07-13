@@ -57,7 +57,7 @@ export function useTasks(listId = 'today') {
     } finally {
       setLoading(false);
     }
-  }, [listId, currentListId]);
+  }, [listId, currentListId, tasks]);
 
   // 初始加载
   useEffect(() => {
@@ -212,9 +212,14 @@ export function useTasks(listId = 'today') {
     });
   }, [tasks, handleUpdateTask]);
 
-  // 更新任务文本
-  const handleUpdateTaskText = useCallback(async (taskId, text) => {
-    return await handleUpdateTask(taskId, { text });
+  // 更新任务文本和预计时间
+  const handleUpdateTaskText = useCallback(async (taskId, updates) => {
+    // 兼容旧接口：如果第二个参数是字符串，则只更新文本
+    if (typeof updates === 'string') {
+      return await handleUpdateTask(taskId, { text: updates });
+    }
+    // 新接口：接受包含text和estimatedTime的对象
+    return await handleUpdateTask(taskId, updates);
   }, [handleUpdateTask]);
 
   // 获取指定象限的任务

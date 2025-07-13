@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'iTodoApp';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   TASKS: 'tasks',
@@ -11,7 +11,7 @@ const STORES = {
 // 数据库初始化
 export async function initDB() {
   const db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       // 任务存储
       if (!db.objectStoreNames.contains(STORES.TASKS)) {
         const taskStore = db.createObjectStore(STORES.TASKS, {
@@ -30,6 +30,27 @@ export async function initDB() {
         });
         listStore.createIndex('isActive', 'isActive');
         listStore.createIndex('createdAt', 'createdAt');
+      }
+
+      // 版本升级处理
+      if (oldVersion < 2) {
+        // 为现有任务添加 estimatedTime 字段
+        const transaction = db.transaction;
+        const taskStore = transaction.objectStore(STORES.TASKS);
+        
+        // 使用cursor遍历所有任务
+        const request = taskStore.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const task = cursor.value;
+            if (!task.hasOwnProperty('estimatedTime')) {
+              task.estimatedTime = '';
+              cursor.update(task);
+            }
+            cursor.continue();
+          }
+        };
       }
     }
   });
@@ -88,6 +109,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 1,
         listId: 'today',
+        estimatedTime: '2小时',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 0
@@ -98,6 +120,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 1,
         listId: 'today',
+        estimatedTime: '30分钟',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 1
@@ -108,6 +131,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 2,
         listId: 'today',
+        estimatedTime: '1小时',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 0
@@ -118,6 +142,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 2,
         listId: 'today',
+        estimatedTime: '45分钟',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 1
@@ -128,6 +153,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 3,
         listId: 'today',
+        estimatedTime: '1小时',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 0
@@ -138,6 +164,7 @@ async function initDefaultTaskLists(db) {
         completed: 0, // false
         quadrant: 4,
         listId: 'today',
+        estimatedTime: '30分钟',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 0
@@ -191,6 +218,7 @@ export async function addTask(taskData) {
     completed: 0, // false
     quadrant: taskData.quadrant || 1,
     listId: taskData.listId || 'today',
+    estimatedTime: taskData.estimatedTime || '',
     createdAt: new Date(),
     updatedAt: new Date(),
     order: taskData.order || 0

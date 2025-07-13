@@ -145,7 +145,7 @@ export default function QuadrantGrid() {
   return (
     <DragContext onDragEnd={handleDragEnd}>
       <main className="mx-auto">
-        <div className="grid grid-cols-1 gap-6  p-6 md:grid-cols-2 md:grid-rows-2 md:justify-center">
+        <div className="grid grid-cols-1 gap-6  p-6 md:grid-cols-2  md:justify-center">
           {QUADRANT_CONFIG.map((config) => (
             <MemoizedQuadrant
               key={config.id}
