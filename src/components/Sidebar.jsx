@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTaskLists } from '@/hooks/useTaskLists';
-import { useSidebarState, useTheme } from '@/hooks/useLocalStorage';
+import { useSidebarState } from '@/hooks/useSidebarState';
+import { useTheme } from '@/hooks/useTheme';
 
 const THEME_OPTIONS = [
   { value: 'parchment', label: '羊皮纸经典' },
-  { value: 'ink-blue', label: '墨水深蓝' },
+  { value: 'dark-blue', label: '墨水深蓝' },
   { value: 'forest-green', label: '森林绿意' },
-  { value: 'dawn-gold', label: '晨曦金黄' }
+  { value: 'morning-gold', label: '晨曦金黄' }
 ];
 
 export default function Sidebar() {
