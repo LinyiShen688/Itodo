@@ -74,15 +74,8 @@ async function initDefaultTaskLists(db) {
         updatedAt: new Date()
       },
       {
-        id: 'tomorrow',
-        name: '明天要做的事',
-        isActive: 0, // false
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'learning',
-        name: '学习的事',
+        id: 'AI',
+        name: '让DeepSeek做的事',
         isActive: 0, // false
         createdAt: new Date(),
         updatedAt: new Date()
@@ -105,7 +98,7 @@ async function initDefaultTaskLists(db) {
       {
         id: generateId(),
         text: '完成项目提案',
-        completed: 0, // false
+        completed: 1, // false
         quadrant: 1,
         listId: 'today',
         estimatedTime: '2小时',
@@ -164,6 +157,17 @@ async function initDefaultTaskLists(db) {
         quadrant: 4,
         listId: 'today',
         estimatedTime: '30分钟',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        order: 0
+      },
+      {
+        id: generateId(),
+        text: '让DeepSeek写一个一句话就可以生成3D模型的网站',
+        completed: 0, // false
+        quadrant: 1,
+        listId: 'AI',
+        estimatedTime: '24小时',
         createdAt: new Date(),
         updatedAt: new Date(),
         order: 0

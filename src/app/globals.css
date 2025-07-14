@@ -66,18 +66,6 @@
   --texture-color: rgba(228, 220, 211, 0.02);
 }
 
-/* 晨曦金黄主题 */
-[data-theme="morning-gold"] {
-  --parchment: #fefbeb;           /* 淡黄背景 */
-  --parchment-dark: #fef3c7;     /* 较深的淡黄 */
-  --ink-black: #422006;          /* 深棕色文字 */
-  --ink-brown: #92400e;          /* 琥珀色文字 */
-  --accent-gold: #f59e0b;        /* 金黄色强调 */
-  --shadow-soft: rgba(146, 64, 14, 0.1);
-  --white-trans: rgba(255, 255, 255, 0.7);
-  --texture-color: rgba(146, 64, 14, 0.03);
-}
-
 
 
 body {

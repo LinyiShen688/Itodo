@@ -22,7 +22,7 @@ export function ThemeProvider({ children }) {
   const value = {
     theme,
     setTheme,
-    themes: ['minimal', 'parchment', 'dark-blue', 'forest-green', 'morning-gold'],
+    themes: ['minimal', 'parchment', 'dark-blue', 'forest-green'],
   };
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
