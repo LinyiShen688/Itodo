@@ -6,17 +6,13 @@ import { useLocalStorage } from './useLocalStorage';
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useLocalStorage('iTodo-theme', 'parchment');
+  const [theme, setTheme] = useLocalStorage('iTodo-theme', 'minimal');
 
   useEffect(() => {
     const root = window.document.documentElement;
     
-    // For the default theme, we don't want a data-theme attribute
-    if (theme === 'parchment') {
-      root.removeAttribute('data-theme');
-    } else {
-      root.setAttribute('data-theme', theme);
-    }
+    // 为所有主题设置 data-theme 属性
+    root.setAttribute('data-theme', theme);
   }, [theme]);
 
   const value = {
