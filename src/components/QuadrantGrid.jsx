@@ -49,23 +49,12 @@ const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
 
 export default function QuadrantGrid() {
   const { activeList } = useTaskLists();
-  const {
-    tasks,
-    loading,
-    error,
-    addTask,
-    updateTask,
-    deleteTask,
-    toggleComplete,
-    updateTaskText,
-    moveTask,
-    reorderTasks
-  } = useTasks(activeList?.id);
+  const { tasks, loading, error, addTask, updateTask, deleteTask, toggleComplete, updateTaskText, moveTask, reorderTasks } = useTasks(activeList?.id);
 
   // 处理拖拽结束
-  const handleDragEnd = async (event) => {
+  const handleDragEnd = async event => {
     const { active, over } = event;
-    
+
     if (!over) return;
 
     const activeTaskId = active.id;
@@ -74,7 +63,7 @@ export default function QuadrantGrid() {
     // 找到被拖拽的任务
     let activeTask = null;
     let activeQuadrant = null;
-    
+
     for (const quadrant in tasks) {
       const task = tasks[quadrant].find(t => t.id === activeTaskId);
       if (task) {
@@ -89,7 +78,7 @@ export default function QuadrantGrid() {
     // 检查是否拖拽到另一个任务上 (重新排序)
     let targetTask = null;
     let targetQuadrant = null;
-    
+
     for (const quadrant in tasks) {
       const task = tasks[quadrant].find(t => t.id === overId);
       if (task) {
@@ -105,7 +94,7 @@ export default function QuadrantGrid() {
         const quadrantTasks = [...tasks[activeQuadrant]];
         const oldIndex = quadrantTasks.findIndex(t => t.id === activeTaskId);
         const newIndex = quadrantTasks.findIndex(t => t.id === overId);
-        
+
         if (oldIndex !== newIndex) {
           const reorderedTasks = arrayMove(quadrantTasks, oldIndex, newIndex);
           await reorderTasks(activeQuadrant, reorderedTasks);
@@ -134,9 +123,7 @@ export default function QuadrantGrid() {
     return (
       <main className="mx-auto px-4 py-4 md:p-8 max-w-[1400px]">
         <div className="grid gap-6">
-          <div className="py-8 text-center text-red-500">
-            错误: {error}
-          </div>
+          <div className="py-8 text-center text-red-500">错误: {error}</div>
         </div>
       </main>
     );
@@ -145,8 +132,8 @@ export default function QuadrantGrid() {
   return (
     <DragContext onDragEnd={handleDragEnd}>
       <main className="mx-auto">
-        <div className="grid grid-cols-1 gap-6  p-6 md:grid-cols-2  md:justify-center">
-          {QUADRANT_CONFIG.map((config) => (
+        <div className="grid grid-cols-1 gap-6 p-3  md:p-6 md:grid-cols-2  md:justify-center">
+          {QUADRANT_CONFIG.map(config => (
             <MemoizedQuadrant
               key={config.id}
               quadrantId={config.id}
@@ -155,7 +142,7 @@ export default function QuadrantGrid() {
               isFirst={config.isFirst}
               tasks={tasks[config.id] || []}
               isLoading={loading}
-              onAddTask={(text) => addTask(config.id, text)}
+              onAddTask={text => addTask(config.id, text)}
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
               onToggleComplete={toggleComplete}
@@ -166,4 +153,4 @@ export default function QuadrantGrid() {
       </main>
     </DragContext>
   );
-} 
+}

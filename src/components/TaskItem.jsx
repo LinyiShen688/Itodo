@@ -16,7 +16,7 @@ export default function TaskItem({
   const [isEditing, setIsEditing] = useState(task.text.trim() === '');
   const [currentText, setCurrentText] = useState(task.text);
   const [currentEstimatedTime, setCurrentEstimatedTime] = useState(task.estimatedTime || '');
-  const [showEditOptions, setShowEditOptions] = useState(task.text.trim() !== ''); // 有内容时默认显示
+  const [showEditOptions, setShowEditOptions] = useState(task.text.trim() === ''); // 新建空白任务默认显示
   const textInputRef = useRef(null);
   const timeInputRef = useRef(null);
 
@@ -105,7 +105,7 @@ export default function TaskItem({
   useEffect(() => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
-    setShowEditOptions(task.text.trim() !== ''); // 同步显示状态
+    setShowEditOptions(task.text.trim() === ''); // 同步显示状态：空白任务保持展开
   }, [task.text, task.estimatedTime]);
 
   // 处理复选框点击
@@ -157,7 +157,7 @@ export default function TaskItem({
               onKeyDown={handleTextKeyDown}
               onBlur={undefined}
               onMouseDown={handleInputMouseDown}
-              placeholder="输入任务..."
+              placeholder="输入任务（按tab键切换到下一行）"
               rows={1}
             />
           ) : (
@@ -186,7 +186,7 @@ export default function TaskItem({
                 onChange={handleTimeChange}
                 onKeyDown={handleTextKeyDown}
                 onMouseDown={handleInputMouseDown}
-                placeholder="预计时间，如30分钟、2小时"
+                placeholder="预计时间，如30分钟"
                 rows={1}
               />
             </div>

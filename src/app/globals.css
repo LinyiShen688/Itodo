@@ -666,7 +666,6 @@ body.dragging-active {
   transition: all 0.3s ease;
   font-size: 1.2rem;
   padding: 0 0.5rem;
-  margin-right: 45px; /* 调整以避免与拖拽手柄重叠 */
 }
 
 .task-item:hover .task-delete {
@@ -1191,6 +1190,66 @@ body.dragging-active {
   
   .main-container {
     padding: 1rem;
+  }
+  
+  /* 移动端任务条目优化 */
+  .task-item {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1rem; /* 稍微减小字体 */
+  }
+  
+  /* 移动端任务优先级圆点位置调整 */
+  .task-priority-dot {
+    top:40%;
+    right: 8px; /* 给删除按钮留出更多空间 */
+  }
+  
+  /* 移动端删除按钮位置调整和实时显示 */
+  .task-delete {
+    opacity: 0.6; /* 移动端实时显示删除按钮 */
+    margin-right: 15px; /* 调整位置，与圆点保持合适间距 */
+    font-size: 1.1rem;
+    color: #e74c3c; /* 移动端使用更明显的红色 */
+  }
+  
+  /* 移动端编辑按钮实时显示 */
+  .task-edit {
+    opacity: 0.7; /* 移动端实时显示编辑按钮 */
+    color: var(--ink-brown);
+  }
+  
+  /* 移动端拖拽手柄位置调整 */
+  .task-drag-handle {
+    right: 8px; /* 更靠近右边缘 */
+    font-size: 1rem; /* 稍微减小 */
+  }
+  
+  /* 移动端任务文本样式 */
+  .task-text {
+    font-size: 1rem; /* 从 1.2rem 减少到 1rem */
+    line-height: 1.4;
+  }
+  
+  /* 移动端复选框稍微减小 */
+  .task-checkbox {
+    width: 18px;
+    height: 18px;
+  }
+  
+  /* 移动端象限容器优化 */
+  .quadrant {
+    padding: 1rem;
+    min-height: 250px; /* 从 300px 减少到 250px */
+  }
+  
+  /* 移动端象限标题 */
+  .quadrant-title {
+    font-size: 1.6rem; /* 从 1.8rem 减少 */
+  }
+  
+  .quadrant.first-quadrant .quadrant-title {
+    font-size: 1.8rem; /* 从 2rem 减少 */
   }
 }
 
