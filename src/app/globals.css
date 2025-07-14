@@ -52,6 +52,8 @@
   --shadow-soft: rgba(226, 232, 240, 0.1);
   --white-trans: rgba(30, 41, 59, 0.6);
   --texture-color: rgba(226, 232, 240, 0.02);
+  
+
 }
 
 /* 森林绿意主题 */
@@ -64,6 +66,8 @@
   --shadow-soft: rgba(228, 220, 211, 0.1);
   --white-trans: rgba(41, 77, 61, 0.6);
   --texture-color: rgba(228, 220, 211, 0.02);
+  
+
 }
 
 
@@ -290,6 +294,72 @@ header {
     0 0 0 1px rgba(93, 78, 55, 0.08),
     0 4px 16px rgba(93, 78, 55, 0.12),
     0 8px 32px rgba(29, 29, 31, 0.06);
+}
+
+/* 深蓝主题的第一象限样式 */
+[data-theme="dark-blue"] .quadrant.first-quadrant {
+  background: 
+    linear-gradient(135deg, 
+      rgba(30, 41, 59, 0.9) 0%, 
+      rgba(15, 23, 42, 0.85) 50%,
+      rgba(30, 41, 59, 0.9) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 
+    0 0 0 4px rgba(56, 189, 248, 0.08),
+    0 0 0 8px rgba(56, 189, 248, 0.04),
+    0 6px 20px rgba(56, 189, 248, 0.15),
+    0 12px 40px rgba(226, 232, 240, 0.1);
+  animation: gentleGlow 3s ease-in-out infinite;
+}
+
+[data-theme="dark-blue"] .quadrant.first-quadrant:hover {
+  transform: translateY(-8px);
+  animation-play-state: paused;
+}
+
+/* 森林绿主题的第一象限样式 */
+[data-theme="forest-green"] .quadrant.first-quadrant {
+  background: 
+    linear-gradient(135deg, 
+      rgba(41, 77, 61, 0.9) 0%, 
+      rgba(26, 46, 38, 0.85) 50%,
+      rgba(41, 77, 61, 0.9) 100%);
+  border: 1px solid rgba(104, 211, 145, 0.4);
+  box-shadow: 
+    0 0 0 4px rgba(104, 211, 145, 0.08),
+    0 0 0 8px rgba(104, 211, 145, 0.04),
+    0 6px 20px rgba(104, 211, 145, 0.15),
+    0 12px 40px rgba(228, 220, 211, 0.1);
+  animation: gentleGlow 3s ease-in-out infinite;
+}
+
+[data-theme="forest-green"] .quadrant.first-quadrant:hover {
+  transform: translateY(-8px);
+  animation-play-state: paused;
+}
+
+/* 深蓝主题的第一象限任务条目样式 */
+[data-theme="dark-blue"] .quadrant.first-quadrant .task-item {
+  background: rgba(30, 41, 59, 0.8);
+  border-left: 3px solid var(--accent-gold);
+  padding-left: 1.25rem;
+}
+
+[data-theme="dark-blue"] .quadrant.first-quadrant .task-item:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-left-width: 4px;
+}
+
+/* 森林绿主题的第一象限任务条目样式 */
+[data-theme="forest-green"] .quadrant.first-quadrant .task-item {
+  background: rgba(41, 77, 61, 0.8);
+  border-left: 3px solid var(--accent-gold);
+  padding-left: 1.25rem;
+}
+
+[data-theme="forest-green"] .quadrant.first-quadrant .task-item:hover {
+  background: rgba(41, 77, 61, 0.95);
+  border-left-width: 4px;
 }
 
 
