@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import PomodoroTimer from './PomodoroTimer';
+import SummaryModal from './SummaryModal';
 
 export default function Header({ currentTaskName = "今日待办" }) {
   const { theme, setTheme, themes } = useTheme();
   const [showPomodoro, setShowPomodoro] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   const handleThemeChange = () => {
     const currentIndex = themes.indexOf(theme);
@@ -17,9 +19,17 @@ export default function Header({ currentTaskName = "今日待办" }) {
   const togglePomodoro = () => {
     setShowPomodoro(!showPomodoro);
   };
-
+  
   const closePomodoro = () => {
     setShowPomodoro(false);
+  };
+
+  const toggleSummary = () => {
+    setShowSummary(!showSummary);
+  };
+
+  const closeSummary = () => {
+    setShowSummary(false);
   };
 
   return (
@@ -45,13 +55,21 @@ export default function Header({ currentTaskName = "今日待办" }) {
 
         {/* 右侧图标组 */}
         <div className="flex items-center space-x-4">
-          <button
+          {/* <button
             onClick={handleThemeChange}
             title="切换主题"
             className="flex h-9 w-9 items-center justify-center rounded-full text-[20px] shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
             style={{ background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))" }}
           >
             🎨
+          </button> */}
+          <button
+            onClick={toggleSummary}
+            title="任务总结"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[20px] shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
+            style={{ background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))" }}
+          >
+            📊
           </button>
           <button
             onClick={togglePomodoro}
@@ -68,6 +86,12 @@ export default function Header({ currentTaskName = "今日待办" }) {
       <PomodoroTimer 
         isVisible={showPomodoro} 
         onClose={closePomodoro}
+      />
+
+      {/* 总结弹窗组件 */}
+      <SummaryModal 
+        isVisible={showSummary}
+        onClose={closeSummary}
       />
     </>
   );
