@@ -35,6 +35,8 @@ export default function Quadrant({
     id: `quadrant-${quadrantId}`,
   });
 
+  // 通过 CSS transition 在 TaskItem 上实现轻量动画，无额外依赖
+
   // 处理标题编辑
   const handleEditTitle = () => {
     setIsEditing(true);

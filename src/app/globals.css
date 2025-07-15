@@ -1251,6 +1251,11 @@ body.dragging-active {
   .quadrant.first-quadrant .quadrant-title {
     font-size: 1.8rem; /* 从 2rem 减少 */
   }
+
+  .sidebar-toggle{
+    width: 37px;
+    height: 90px;
+  }
 }
 
 /* 动画 */

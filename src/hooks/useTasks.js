@@ -48,6 +48,16 @@ export function useTasks(listId = 'today') {
       allTasks.forEach(task => {
         groupedTasks[task.quadrant].push(task);
       });
+
+      // 按“未完成在前、完成在后”排序，同时保持既有 order
+      for (const q in groupedTasks) {
+        groupedTasks[q].sort((a, b) => {
+          if (a.completed !== b.completed) {
+            return a.completed - b.completed; // 0 在前
+          }
+          return a.order - b.order;
+        });
+      }
       
       setTasks(groupedTasks);
       setCurrentListId(listId);
@@ -204,12 +214,53 @@ export function useTasks(listId = 'today') {
 
   // 切换任务完成状态
   const handleToggleComplete = useCallback(async (taskId) => {
-    const task = Object.values(tasks).flat().find(t => t.id === taskId);
-    if (!task) return;
-    
-    return await handleUpdateTask(taskId, {
-      completed: task.completed ? 0 : 1
+    const taskEntry = Object.entries(tasks).find(([_q, arr]) => arr.some(t => t.id === taskId));
+    if (!taskEntry) return;
+
+    const [quadrantKey, quadrantTasks] = taskEntry;
+    const quadrant = parseInt(quadrantKey);
+    const taskIndex = quadrantTasks.findIndex(t => t.id === taskId);
+    const task = quadrantTasks[taskIndex];
+
+    const newCompleted = task.completed ? 0 : 1;
+
+    // 先更新 completed 字段
+    const updatedTask = await handleUpdateTask(taskId, { completed: newCompleted });
+
+    // 重新排序本象限：未完成在前，完成在后
+    setTasks(prev => {
+      const newQuadrantTasks = [...prev[quadrant]];
+      // 替换更新后的任务
+      newQuadrantTasks[taskIndex] = updatedTask;
+
+      // 重新排序
+      newQuadrantTasks.sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed - b.completed;
+        return a.order - b.order;
+      });
+
+      // 重新赋值 order
+      newQuadrantTasks.forEach((t, idx) => { t.order = idx; });
+
+      const newState = { ...prev, [quadrant]: newQuadrantTasks };
+      return newState;
     });
+
+    // 持久化 order
+    try {
+      await reorderTasks(
+        quadrantTasks
+          .map(t => (t.id === taskId ? { ...t, completed: newCompleted } : t))
+          .sort((a, b) => {
+            if (a.completed !== b.completed) return a.completed - b.completed;
+            return a.order - b.order;
+          })
+      );
+    } catch (e) {
+      console.error('Failed to persist reorder after toggle complete:', e);
+    }
+
+    return updatedTask;
   }, [tasks, handleUpdateTask]);
 
   // 更新任务文本和预计时间

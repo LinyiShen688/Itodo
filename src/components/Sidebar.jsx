@@ -229,7 +229,7 @@ export default function Sidebar() {
           ))}
         </div>
         
-        <h2>视图设置 <span className="text-xs text-ink-brown">(仅影响新建列表)</span></h2>
+        <h2>视图设置</h2>
         <div className="flex flex-col gap-2 pb-4">
           <label className="flex items-center justify-between gap-2">
             <span>四象限模式</span>
