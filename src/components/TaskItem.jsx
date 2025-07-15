@@ -10,7 +10,8 @@ export default function TaskItem({
   onToggleComplete,
   onUpdateText,
   dragListeners,
-  setActivatorNodeRef
+  setActivatorNodeRef,
+  showETA = true
 }) {
   // 空白任务自动进入编辑模式
   const [isEditing, setIsEditing] = useState(task.text.trim() === '');
@@ -170,13 +171,13 @@ export default function TaskItem({
           )}
 
           {/* 非编辑状态下显示时间 badge */}
-          {!isEditing && task.estimatedTime && (
+          {!isEditing && showETA && task.estimatedTime && (
             <span className="task-time-badge">{task.estimatedTime}</span>
           )}
         </div>
 
         {/* 编辑模式的扩展区域 */}
-        {isEditing && (
+        {isEditing && showETA && (
           <div className={`task-edit-expansion ${showEditOptions ? 'show' : ''}`}>
             <div className="task-time-editor">
               <textarea

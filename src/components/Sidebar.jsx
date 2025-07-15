@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTaskLists } from '@/hooks/useTaskLists';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useTheme } from '@/hooks/useTheme';
+import { useAppSettings } from '@/hooks/useAppSettings';
 
 const THEME_OPTIONS = [
   { value: 'minimal', label: '简约' },
@@ -15,6 +16,7 @@ const THEME_OPTIONS = [
 export default function Sidebar() {
   const { isOpen, setIsOpen } = useSidebarState();
   const { theme, setTheme } = useTheme();
+  const { defaultLayoutMode, defaultShowETA, toggleDefaultLayoutMode, toggleDefaultShowETA } = useAppSettings();
   const {
     taskLists,
     activeList,
@@ -52,7 +54,7 @@ export default function Sidebar() {
   const finishCreatingTaskList = async () => {
     if (newListName.trim()) {
       try {
-        await addTaskList(newListName.trim());
+        await addTaskList(newListName.trim(), defaultLayoutMode, defaultShowETA);
         setNewListName('');
         setIsCreating(false);
       } catch (error) {
@@ -227,6 +229,26 @@ export default function Sidebar() {
           ))}
         </div>
         
+        <h2>视图设置 <span className="text-xs text-ink-brown">(仅影响新建列表)</span></h2>
+        <div className="flex flex-col gap-2 pb-4">
+          <label className="flex items-center justify-between gap-2">
+            <span>四象限模式</span>
+            <input
+              type="checkbox"
+              checked={defaultLayoutMode === 'FOUR'}
+              onChange={toggleDefaultLayoutMode}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span>显示预计时间</span>
+            <input
+              type="checkbox"
+              checked={defaultShowETA}
+              onChange={toggleDefaultShowETA}
+            />
+          </label>
+        </div>
+
         <h2>主题</h2>
         <div className="theme-selector">
           <select value={theme} onChange={handleThemeChange}>

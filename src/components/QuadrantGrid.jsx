@@ -34,6 +34,11 @@ const QUADRANT_CONFIG = [
   }
 ];
 
+// Helper to flatten tasks into single array
+function flattenTasks(tasksObj) {
+  return Object.values(tasksObj).flat();
+}
+
 // 记忆化Quadrant组件以避免不必要的重渲染
 const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
   // 只有当关键属性发生变化时才重新渲染
@@ -50,6 +55,10 @@ const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
 export default function QuadrantGrid() {
   const { activeList } = useTaskLists();
   const { tasks, loading, error, addTask, updateTask, deleteTask, toggleComplete, updateTaskText, moveTask, reorderTasks } = useTasks(activeList?.id);
+
+  // 布局与显示时间配置（向后兼容）
+  const layoutMode = activeList?.layoutMode || 'FOUR'; // 'FOUR' | 'SINGLE'
+  const showETA = activeList?.showETA !== undefined ? activeList.showETA : true;
 
   // 处理拖拽结束
   const handleDragEnd = async event => {
@@ -129,24 +138,29 @@ export default function QuadrantGrid() {
     );
   }
 
+  // 根据布局确定渲染的象限
+  const quadrantsToRender = layoutMode === 'FOUR' ? QUADRANT_CONFIG : [QUADRANT_CONFIG[0]];
+
   return (
     <DragContext onDragEnd={handleDragEnd}>
       <main className="mx-auto">
-        <div className="grid grid-cols-1 gap-6 p-3  md:p-6 md:grid-cols-2  md:justify-center">
-          {QUADRANT_CONFIG.map(config => (
+        <div className={layoutMode === 'FOUR' ? 'grid grid-cols-1 gap-6 p-3  md:p-6 md:grid-cols-2  md:justify-center' : 'flex flex-col gap-6 p-3 md:p-6 max-w-xl mx-auto'}>
+          {quadrantsToRender.map(config => (
             <MemoizedQuadrant
               key={config.id}
               quadrantId={config.id}
               title={config.title}
               tooltip={config.tooltip}
               isFirst={config.isFirst}
-              tasks={tasks[config.id] || []}
+              tasks={layoutMode === 'FOUR' ? (tasks[config.id] || []) : flattenTasks(tasks)}
               isLoading={loading}
               onAddTask={text => addTask(config.id, text)}
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
               onToggleComplete={toggleComplete}
               onUpdateTaskText={updateTaskText}
+              layoutMode={layoutMode}
+              showETA={showETA}
             />
           ))}
         </div>

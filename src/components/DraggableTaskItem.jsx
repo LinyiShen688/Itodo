@@ -10,7 +10,8 @@ export default function DraggableTaskItem({
   onUpdate,
   onDelete,
   onToggleComplete,
-  onUpdateText
+  onUpdateText,
+  showETA = true
 }) {
   const {
     attributes,
@@ -44,6 +45,7 @@ export default function DraggableTaskItem({
         onUpdateText={onUpdateText}
         dragListeners={listeners}
         setActivatorNodeRef={setActivatorNodeRef}
+        showETA={showETA}
       />
     </div>
   );

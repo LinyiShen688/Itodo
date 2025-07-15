@@ -1,5 +1,6 @@
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { AppSettingsProvider } from "@/hooks/useAppSettings";
 
 export const metadata = {
   title: "iTodo - Your Focus Companion",
@@ -10,7 +11,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-CN">
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AppSettingsProvider>{children}</AppSettingsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

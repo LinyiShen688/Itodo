@@ -24,6 +24,8 @@ export default function Quadrant({
   onDeleteTask,
   onToggleComplete,
   onUpdateTaskText
+  ,layoutMode = 'FOUR'
+  ,showETA = true
 }) {
   const [currentTitle, setCurrentTitle] = useState(title);
   const [isEditing, setIsEditing] = useState(false);
@@ -89,39 +91,34 @@ export default function Quadrant({
       className={quadrantClass} 
       onClick={handleQuadrantClick}
     >
-      
-      {/* 各象限的优先徽章 */}
-      {(() => {
-        const badgeMap = {
-          1: '立即做',
-          2: '计划做',
-          3: '外包做',
-          4: '不做'
-        };
-        return <span className="priority-badge">{badgeMap[quadrantId]}</span>;
-      })()}
-      
-      {/* 象限标题区域 */}
-      <div className="quadrant-header">
-        <input
-          ref={titleInputRef}
-          type="text"
-          className={`quadrant-title ${isEditing ? 'editing' : ''}`}
-          value={currentTitle}
-          onChange={handleTitleChange}
-          onKeyDown={handleTitleKeyDown}
-          onBlur={handleTitleBlur}
-          readOnly={!isEditing}
-          title={tooltip}
-        />
-        {/* <span 
-          className="edit-icon" 
-          onClick={handleEditTitle}
-        >
-          ✏️
-        </span> */}
-      </div>
-      
+      {/* 象限徽章与标题，仅在四象限模式下显示 */}
+      {layoutMode === 'FOUR' && (
+        <>
+          {(() => {
+            const badgeMap = {
+              1: '立即做',
+              2: '计划做',
+              3: '外包做',
+              4: '不做'
+            };
+            return <span className="priority-badge">{badgeMap[quadrantId]}</span>;
+          })()}
+          <div className="quadrant-header">
+            <input
+              ref={titleInputRef}
+              type="text"
+              className={`quadrant-title ${isEditing ? 'editing' : ''}`}
+              value={currentTitle}
+              onChange={handleTitleChange}
+              onKeyDown={handleTitleKeyDown}
+              onBlur={handleTitleBlur}
+              readOnly={!isEditing}
+              title={tooltip}
+            />
+          </div>
+        </>
+      )}
+ 
       {/* 任务列表 */}
       <div 
         ref={setNodeRef}
@@ -138,11 +135,12 @@ export default function Quadrant({
               onDelete={onDeleteTask}
               onToggleComplete={onToggleComplete}
               onUpdateText={onUpdateTaskText}
+              showETA={showETA}
             />
           ))}
         </SortableContext>
       </div>
-      
+ 
       {/* 添加任务提示 */}
       <div className="add-task-hint">点击空白添加新任务</div>
     </div>

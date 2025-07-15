@@ -70,6 +70,8 @@ async function initDefaultTaskLists(db) {
         id: 'today',
         name: '今天要做的事',
         isActive: 1, // true
+        layoutMode: 'FOUR',
+        showETA: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -77,6 +79,8 @@ async function initDefaultTaskLists(db) {
         id: 'AI',
         name: '让DeepSeek做的事',
         isActive: 0, // false
+        layoutMode: 'FOUR',
+        showETA: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -84,6 +88,8 @@ async function initDefaultTaskLists(db) {
         id: 'work',
         name: '工作的事',
         isActive: 0, // false
+        layoutMode: 'FOUR',
+        showETA: true,
         createdAt: new Date(),
         updatedAt: new Date()
       }
@@ -297,13 +303,15 @@ export async function getActiveTaskList() {
 }
 
 // 添加新任务列表
-export async function addTaskList(name) {
+export async function addTaskList(name, layoutMode = 'FOUR', showETA = true) {
   const db = await initDB();
   
   const taskList = {
     id: generateId(),
     name: name,
     isActive: 0, // false
+    layoutMode,
+    showETA,
     createdAt: new Date(),
     updatedAt: new Date()
   };

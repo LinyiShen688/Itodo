@@ -43,9 +43,9 @@ export function useTaskLists() {
   }, [loadTaskLists]);
 
   // 添加新任务列表
-  const handleAddTaskList = useCallback(async (name) => {
+  const handleAddTaskList = useCallback(async (name, layoutMode = 'FOUR', showETA = true) => {
     try {
-      const newList = await addTaskList(name);
+      const newList = await addTaskList(name, layoutMode, showETA);
       setTaskLists(prev => [...prev, newList]);
       return newList;
     } catch (err) {
