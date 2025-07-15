@@ -575,8 +575,8 @@ body.dragging-active {
 
 /* 任务复选框 */
 .task-checkbox {
-  width: 20px;
-  height: 20px;
+  width: 21px;
+  height: 21px;
   border: 2px solid var(--ink-brown);
   border-radius: 50%;
   cursor: pointer;

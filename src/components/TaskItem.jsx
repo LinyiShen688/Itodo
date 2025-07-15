@@ -158,7 +158,7 @@ export default function TaskItem({
               onKeyDown={handleTextKeyDown}
               onBlur={undefined}
               onMouseDown={handleInputMouseDown}
-              placeholder="输入任务（按tab键切换到下一行）"
+              placeholder="输入任务（按Tab键切换下行）"
               rows={1}
             />
           ) : (
