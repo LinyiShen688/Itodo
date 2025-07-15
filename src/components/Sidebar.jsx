@@ -5,6 +5,7 @@ import { useTaskLists } from '@/hooks/useTaskLists';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings } from '@/hooks/useAppSettings';
+import IOSToggle from './IOSToggle';
 
 const THEME_OPTIONS = [
   { value: 'minimal', label: '简约' },
@@ -230,23 +231,17 @@ export default function Sidebar() {
         </div>
         
         <h2>视图设置</h2>
-        <div className="flex flex-col gap-2 pb-4">
-          <label className="flex items-center justify-between gap-2">
-            <span>四象限模式</span>
-            <input
-              type="checkbox"
-              checked={defaultLayoutMode === 'FOUR'}
-              onChange={toggleDefaultLayoutMode}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2">
-            <span>显示预计时间</span>
-            <input
-              type="checkbox"
-              checked={defaultShowETA}
-              onChange={toggleDefaultShowETA}
-            />
-          </label>
+        <div className="flex flex-col gap-3 pb-4">
+          <IOSToggle
+            label="四象限模式"
+            checked={defaultLayoutMode === 'FOUR'}
+            onChange={toggleDefaultLayoutMode}
+          />
+          <IOSToggle
+            label="显示预计时间"
+            checked={defaultShowETA}
+            onChange={toggleDefaultShowETA}
+          />
         </div>
 
         <h2>主题</h2>
