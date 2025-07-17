@@ -177,20 +177,22 @@ export default function TaskItem({
         </div>
 
         {/* 编辑模式的扩展区域 */}
-        {isEditing && showETA && (
+        {isEditing && (
           <div className={`task-edit-expansion ${showEditOptions ? 'show' : ''}`}>
-            <div className="task-time-editor">
-              <textarea
-                ref={timeInputRef}
-                className="task-time-input"
-                value={currentEstimatedTime}
-                onChange={handleTimeChange}
-                onKeyDown={handleTextKeyDown}
-                onMouseDown={handleInputMouseDown}
-                placeholder="预计时间，如30分钟"
-                rows={1}
-              />
-            </div>
+            {showETA && (
+              <div className="task-time-editor">
+                <textarea
+                  ref={timeInputRef}
+                  className="task-time-input"
+                  value={currentEstimatedTime}
+                  onChange={handleTimeChange}
+                  onKeyDown={handleTextKeyDown}
+                  onMouseDown={handleInputMouseDown}
+                  placeholder="预计时间，如30分钟"
+                  rows={1}
+                />
+              </div>
+            )}
 
             {/* 编辑模式的按钮栏 */}
             <div className="flex gap-2 pt-2">
