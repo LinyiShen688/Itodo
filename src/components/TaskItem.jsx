@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function TaskItem({
   task,
@@ -30,6 +31,23 @@ export default function TaskItem({
     }
   };
 
+  // 防抖的文本保存函数
+  const debouncedSaveText = useDebounce(async (text, estimatedTime) => {
+    const hasTextChanged = text.trim() !== task.text;
+    const hasTimeChanged = estimatedTime !== (task.estimatedTime || '');
+    
+    if (hasTextChanged || hasTimeChanged) {
+      try {
+        await onUpdateText(task.id, {
+          text: text.trim(),
+          estimatedTime: estimatedTime.trim()
+        });
+      } catch (error) {
+        console.error('Failed to auto-save task:', error);
+      }
+    }
+  }, 1000, [task.id, task.text, task.estimatedTime, onUpdateText]);
+
   const handleTextChange = (e) => {
     const newText = e.target.value;
     setCurrentText(newText);
@@ -43,6 +61,11 @@ export default function TaskItem({
     if (textInputRef.current) {
       textInputRef.current.style.height = 'auto';
       textInputRef.current.style.height = textInputRef.current.scrollHeight + 'px';
+    }
+
+    // 防抖自动保存（仅在编辑模式下）
+    if (isEditing && newText.trim() !== task.text) {
+      debouncedSaveText(newText, currentEstimatedTime);
     }
   };
 
@@ -75,7 +98,13 @@ export default function TaskItem({
 
   // 处理预计时间输入
   const handleTimeChange = (e) => {
-    setCurrentEstimatedTime(e.target.value);
+    const newTime = e.target.value;
+    setCurrentEstimatedTime(newTime);
+
+    // 防抖自动保存（仅在编辑模式下）
+    if (isEditing && newTime !== (task.estimatedTime || '')) {
+      debouncedSaveText(currentText, newTime);
+    }
   };
 
   // Enter 提交（Shift+Enter 换行），Esc 取消

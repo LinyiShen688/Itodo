@@ -10,6 +10,7 @@ import {
   reorderTasks as dbReorderTasks
 } from '@/lib/indexeddb';
 import { useTrashStore } from './trashStore';
+import { toast } from '@/utils/toast';
 
 // 初始任务状态
 const initialTasksState = {
@@ -101,6 +102,7 @@ export const useTaskStore = create((set, get) => ({
     } catch (err) {
       console.error('Failed to add task:', err);
       set({ error: err.message });
+      toast.error('添加任务失败');
       throw err;
     }
   },
@@ -153,6 +155,7 @@ export const useTaskStore = create((set, get) => ({
       // 如果是乐观更新失败，需要回滚
       if (optimistic) {
         get().loadTasks(get().currentListId, true);
+        toast.error('更新任务失败，已恢复原状态');
       }
       set({ error: err.message });
       throw err;
@@ -175,6 +178,19 @@ export const useTaskStore = create((set, get) => ({
 
       // 更新收纳箱计数
       useTrashStore.getState().incrementDeletedCount();
+      
+      // 成功提示
+      toast.success('任务已移至收纳箱', { 
+        duration: 3000,
+        action: {
+          label: '查看收纳箱',
+          onClick: () => {
+            // 可以在这里触发打开收纳箱的事件
+            window.dispatchEvent(new CustomEvent('openTrash'));
+          }
+        }
+      });
+      
     } catch (err) {
       console.error('Failed to delete task:', err);
       set({ error: err.message });
@@ -223,6 +239,15 @@ export const useTaskStore = create((set, get) => ({
       // 回滚
       get().loadTasks(get().currentListId, true);
       set({ error: err.message });
+      toast.error('移动任务失败，已恢复原位置', {
+        duration: 4000,
+        action: {
+          label: '重试',
+          onClick: () => {
+            // 可以在这里添加重试逻辑
+          }
+        }
+      });
       throw err;
     }
   },
@@ -245,6 +270,9 @@ export const useTaskStore = create((set, get) => ({
       // 回滚
       await get().loadTasks(get().currentListId, true);
       set({ error: err.message });
+      toast.error('任务排序失败，已恢复原顺序', {
+        duration: 4000
+      });
       throw err;
     }
   },
@@ -308,6 +336,9 @@ export const useTaskStore = create((set, get) => ({
     } catch (err) {
       console.error('Failed to toggle task completion:', err);
       set({ error: err.message });
+      toast.error('切换任务状态失败', {
+        duration: 3000
+      });
       throw err;
     }
   },
@@ -335,35 +366,83 @@ export const useTaskStore = create((set, get) => ({
     return Object.values(get().tasks).flat().filter(t => t.completed).length;
   },
 
-  // 批量操作支持（未来扩展）
+  // 批量操作支持（性能优化）
   batchUpdate: (updates) => {
     set(state => ({
       pendingUpdates: [...state.pendingUpdates, ...updates]
     }));
     
-    // 防抖执行
+    get()._scheduleBatchExecution();
+  },
+
+  // 内部：调度批量执行
+  _scheduleBatchExecution: () => {
     const state = get();
     if (state.updateTimeoutId) {
       clearTimeout(state.updateTimeoutId);
     }
     
     const timeoutId = setTimeout(async () => {
-      const pendingUpdates = get().pendingUpdates;
-      set({ pendingUpdates: [], updateTimeoutId: null });
-      
-      // 执行批量更新
-      try {
-        await Promise.all(
-          pendingUpdates.map(update => 
-            dbUpdateTask(update.id, update.data)
-          )
-        );
-      } catch (err) {
-        console.error('Batch update failed:', err);
-      }
-    }, 500);
+      await get()._executeBatchUpdates();
+    }, 300); // 减少延迟到300ms，提升响应速度
     
     set({ updateTimeoutId: timeoutId });
+  },
+
+  // 内部：执行批量更新
+  _executeBatchUpdates: async () => {
+    const state = get();
+    const pendingUpdates = state.pendingUpdates;
+    
+    if (pendingUpdates.length === 0) return;
+    
+    // 清空队列
+    set({ pendingUpdates: [], updateTimeoutId: null });
+    
+    try {
+      // 合并相同任务的更新
+      const mergedUpdates = pendingUpdates.reduce((acc, update) => {
+        if (acc[update.id]) {
+          acc[update.id] = { ...acc[update.id], ...update.data };
+        } else {
+          acc[update.id] = update.data;
+        }
+        return acc;
+      }, {});
+
+      // 执行批量更新
+      const updatePromises = Object.entries(mergedUpdates).map(([id, data]) => 
+        dbUpdateTask(id, data)
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // 批量更新成功提示
+      const successCount = updatePromises.length;
+      console.log(`Batch update completed: ${successCount} tasks updated`);
+      
+      if (successCount > 1) {
+        toast.success(`成功更新 ${successCount} 个任务`, { duration: 2000 });
+      }
+      
+    } catch (err) {
+      console.error('Batch update failed:', err);
+      // 重新加载以确保数据一致性
+      get().loadTasks(state.currentListId, true);
+      set({ error: 'Batch update failed. Data reloaded.' });
+      toast.error('批量更新失败，已重新加载数据', { duration: 4000 });
+    }
+  },
+
+  // 智能更新：小更新使用批量，大更新直接执行
+  smartUpdate: async (taskId, updates, immediate = false) => {
+    if (immediate) {
+      // 立即执行
+      return await get().updateTask(taskId, updates);
+    }
+    
+    // 添加到批量队列
+    get().batchUpdate([{ id: taskId, data: updates }]);
   },
 
   // 重置状态

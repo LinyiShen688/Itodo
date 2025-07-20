@@ -3,8 +3,10 @@
 import React from 'react';
 import Quadrant from './Quadrant';
 import DragContext from './DragContext';
+import LoadingState, { LoadingWrapper } from '@/components/LoadingState';
 import { useTaskStore } from '@/stores/taskStore';
 import { useTaskListStore } from '@/stores/taskListStore';
+import { useThrottle } from '@/hooks/useDebounce';
 import { arrayMove } from '@dnd-kit/sortable';
 
 const QUADRANT_CONFIG = [
@@ -39,6 +41,25 @@ function flattenTasks(tasksObj) {
   return Object.values(tasksObj).flat();
 }
 
+// 深度比较函数 - 更高效的任务比较
+function deepCompareTasks(prevTasks, nextTasks) {
+  if (prevTasks.length !== nextTasks.length) return false;
+  
+  for (let i = 0; i < prevTasks.length; i++) {
+    const prev = prevTasks[i];
+    const next = nextTasks[i];
+    
+    if (prev.id !== next.id || 
+        prev.text !== next.text || 
+        prev.completed !== next.completed ||
+        prev.order !== next.order ||
+        prev.estimatedTime !== next.estimatedTime) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // 记忆化Quadrant组件以避免不必要的重渲染
 const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
   // 只有当关键属性发生变化时才重新渲染
@@ -48,7 +69,9 @@ const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
     prevProps.tooltip === nextProps.tooltip &&
     prevProps.isFirst === nextProps.isFirst &&
     prevProps.isLoading === nextProps.isLoading &&
-    JSON.stringify(prevProps.tasks) === JSON.stringify(nextProps.tasks)
+    prevProps.layoutMode === nextProps.layoutMode &&
+    prevProps.showETA === nextProps.showETA &&
+    deepCompareTasks(prevProps.tasks, nextProps.tasks)
   );
 });
 
@@ -64,8 +87,14 @@ export default function QuadrantGrid() {
     toggleComplete, 
     updateTaskText, 
     moveTask, 
-    reorderTasks 
+    reorderTasks,
+    smartUpdate,
+    batchUpdate
   } = useTaskStore();
+
+  // 节流的移动操作，避免拖拽过程中频繁更新
+  const throttledMoveTask = useThrottle(moveTask, 150, [moveTask]);
+  const throttledReorderTasks = useThrottle(reorderTasks, 150, [reorderTasks]);
 
   // 布局与显示时间配置（向后兼容）
   const layoutMode = activeList?.layoutMode || 'FOUR'; // 'FOUR' | 'SINGLE'
@@ -117,12 +146,12 @@ export default function QuadrantGrid() {
 
         if (oldIndex !== newIndex) {
           const reorderedTasks = arrayMove(quadrantTasks, oldIndex, newIndex);
-          await reorderTasks(activeQuadrant, reorderedTasks);
+          await throttledReorderTasks(activeQuadrant, reorderedTasks);
         }
       } else {
         // 移动到不同象限
         const targetIndex = tasks[targetQuadrant].findIndex(t => t.id === overId);
-        await moveTask(activeTaskId, activeQuadrant, targetQuadrant, targetIndex);
+        await throttledMoveTask(activeTaskId, activeQuadrant, targetQuadrant, targetIndex);
       }
     } else {
       // 检查是否拖拽到象限容器上
@@ -131,23 +160,19 @@ export default function QuadrantGrid() {
         const targetQuadrant = parseInt(quadrantMatch[1]);
         if (activeQuadrant !== targetQuadrant) {
           // 移动到象限末尾
-          await moveTask(activeTaskId, activeQuadrant, targetQuadrant, tasks[targetQuadrant].length);
+          await throttledMoveTask(activeTaskId, activeQuadrant, targetQuadrant, tasks[targetQuadrant].length);
         }
       }
     }
   };
 
-  // 移除全局loading状态，改为在数据为空时显示skeleton
+  // 检查是否为空数据状态
+  const isEmpty = !loading && Object.values(tasks).every(arr => arr.length === 0);
 
-  if (error) {
-    return (
-      <main className="mx-auto px-4 py-4 md:p-8 max-w-[1400px]">
-        <div className="grid gap-6">
-          <div className="py-8 text-center text-red-500">错误: {error}</div>
-        </div>
-      </main>
-    );
-  }
+  const retryLoadTasks = () => {
+    const { loadTasks, currentListId } = useTaskStore.getState();
+    loadTasks(currentListId, true);
+  };
 
   // 根据布局确定渲染的象限
   const quadrantsToRender = layoutMode === 'FOUR' ? QUADRANT_CONFIG : [QUADRANT_CONFIG[0]];
@@ -155,26 +180,37 @@ export default function QuadrantGrid() {
   return (
     <DragContext onDragEnd={handleDragEnd}>
       <main className="mx-auto">
-        <div className={layoutMode === 'FOUR' ? 'grid grid-cols-1 gap-6 p-3  md:p-6 md:grid-cols-2  md:justify-center' : 'flex flex-col gap-6 p-3 md:p-6 max-w-xl mx-auto'}>
-          {quadrantsToRender.map(config => (
-            <MemoizedQuadrant
-              key={config.id}
-              quadrantId={config.id}
-              title={config.title}
-              tooltip={config.tooltip}
-              isFirst={config.isFirst}
-              tasks={layoutMode === 'FOUR' ? (tasks[config.id] || []) : flattenTasks(tasks)}
-              isLoading={loading}
-              onAddTask={text => addTask(config.id, text)}
-              onUpdateTask={updateTask}
-              onDeleteTask={deleteTask}
-              onToggleComplete={toggleComplete}
-              onUpdateTaskText={updateTaskText}
-              layoutMode={layoutMode}
-              showETA={showETA}
-            />
-          ))}
-        </div>
+        <LoadingWrapper
+          loading={loading}
+          error={error}
+          empty={isEmpty}
+          emptyMessage="还没有任务，点击空白区域添加第一个任务吧！"
+          errorMessage="加载任务失败"
+          loadingType="skeleton-quadrant"
+          loadingMessage="正在加载任务数据..."
+          onRetry={retryLoadTasks}
+        >
+          <div className={layoutMode === 'FOUR' ? 'grid grid-cols-1 gap-6 p-3  md:p-6 md:grid-cols-2  md:justify-center' : 'flex flex-col gap-6 p-3 md:p-6 max-w-xl mx-auto'}>
+            {quadrantsToRender.map(config => (
+              <MemoizedQuadrant
+                key={config.id}
+                quadrantId={config.id}
+                title={config.title}
+                tooltip={config.tooltip}
+                isFirst={config.isFirst}
+                tasks={layoutMode === 'FOUR' ? (tasks[config.id] || []) : flattenTasks(tasks)}
+                isLoading={loading}
+                onAddTask={text => addTask(config.id, text)}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                onToggleComplete={toggleComplete}
+                onUpdateTaskText={updateTaskText}
+                layoutMode={layoutMode}
+                showETA={showETA}
+              />
+            ))}
+          </div>
+        </LoadingWrapper>
       </main>
     </DragContext>
   );

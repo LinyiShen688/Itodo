@@ -1,6 +1,7 @@
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSettingsProvider } from "@/hooks/useAppSettings";
+import ToastContainer from "@/components/ToastContainer";
 
 export const metadata = {
   title: "iTodo - Your Focus Companion",
@@ -12,7 +13,10 @@ export default function RootLayout({ children }) {
     <html lang="zh-CN">
       <body suppressHydrationWarning={true}>
         <ThemeProvider>
-          <AppSettingsProvider>{children}</AppSettingsProvider>
+          <AppSettingsProvider>
+            {children}
+            <ToastContainer />
+          </AppSettingsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Header from '@/components/Header';
 import QuadrantGrid from '@/components/QuadrantGrid';
 import Sidebar from '@/components/Sidebar';
+import LoadingState from '@/components/LoadingState';
 import { useTrashStore } from '@/stores/trashStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useTaskListStore } from '@/stores/taskListStore';
@@ -24,9 +25,11 @@ export default function Home() {
 
   if (listsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-[var(--ink-brown)] text-xl">加载中...</div>
-      </div>
+      <LoadingState 
+        type="skeleton-quadrant"
+        message="正在加载应用数据..."
+        className="min-h-screen"
+      />
     );
   }
 

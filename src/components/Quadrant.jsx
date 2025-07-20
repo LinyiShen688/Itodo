@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DraggableTaskItem from './DraggableTaskItem';
@@ -11,6 +11,20 @@ const QUADRANT_CLASSES = {
   3: 'third-quadrant',
   4: 'fourth-quadrant'
 };
+
+// 记忆化 TaskItem 渲染
+const MemoizedTaskItem = ({ task, quadrantId, onUpdate, onDelete, onToggleComplete, onUpdateText, showETA }) => (
+  <DraggableTaskItem
+    key={task.id}
+    task={task}
+    quadrantId={quadrantId}
+    onUpdate={onUpdate}
+    onDelete={onDelete}
+    onToggleComplete={onToggleComplete}
+    onUpdateText={onUpdateText}
+    showETA={showETA}
+  />
+);
 
 export default function Quadrant({
   quadrantId,
@@ -23,13 +37,37 @@ export default function Quadrant({
   onUpdateTask,
   onDeleteTask,
   onToggleComplete,
-  onUpdateTaskText
-  ,layoutMode = 'FOUR'
-  ,showETA = true
+  onUpdateTaskText,
+  layoutMode = 'FOUR',
+  showETA = true
 }) {
   const [currentTitle, setCurrentTitle] = useState(title);
   const [isEditing, setIsEditing] = useState(false);
+  const [visibleTaskLimit, setVisibleTaskLimit] = useState(20); // 初始显示20个任务
   const titleInputRef = useRef(null);
+
+  // 记忆化任务 ID 列表，避免不必要的重渲染
+  const taskIds = useMemo(() => tasks.map(task => task.id), [tasks]);
+  
+  // 记忆化可见任务列表
+  const visibleTasks = useMemo(() => {
+    return tasks.slice(0, visibleTaskLimit);
+  }, [tasks, visibleTaskLimit]);
+
+  // 记忆化事件处理器，避免子组件不必要的重渲染
+  const memoizedOnAddTask = useCallback(onAddTask, [onAddTask]);
+  const memoizedOnUpdateTask = useCallback(onUpdateTask, [onUpdateTask]);
+  const memoizedOnDeleteTask = useCallback(onDeleteTask, [onDeleteTask]);
+  const memoizedOnToggleComplete = useCallback(onToggleComplete, [onToggleComplete]);
+  const memoizedOnUpdateTaskText = useCallback(onUpdateTaskText, [onUpdateTaskText]);
+
+  // 加载更多任务
+  const loadMoreTasks = useCallback(() => {
+    setVisibleTaskLimit(prev => Math.min(prev + 20, tasks.length));
+  }, [tasks.length]);
+
+  // 是否有更多任务需要加载
+  const hasMoreTasks = visibleTaskLimit < tasks.length;
   
   const { isOver, setNodeRef } = useDroppable({
     id: `quadrant-${quadrantId}`,
@@ -127,20 +165,49 @@ export default function Quadrant({
         className={`task-list ${isOver ? 'drag-over' : ''}`} 
         data-quadrant={quadrantId}
       >
-        <SortableContext items={tasks} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => (
-            <DraggableTaskItem
+        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+          {visibleTasks.map((task) => (
+            <MemoizedTaskItem
               key={task.id}
               task={task}
               quadrantId={quadrantId}
-              onUpdate={onUpdateTask}
-              onDelete={onDeleteTask}
-              onToggleComplete={onToggleComplete}
-              onUpdateText={onUpdateTaskText}
+              onUpdate={memoizedOnUpdateTask}
+              onDelete={memoizedOnDeleteTask}
+              onToggleComplete={memoizedOnToggleComplete}
+              onUpdateText={memoizedOnUpdateTaskText}
               showETA={showETA}
             />
           ))}
         </SortableContext>
+
+        {/* 加载更多按钮 */}
+        {hasMoreTasks && (
+          <button
+            onClick={loadMoreTasks}
+            className="load-more-btn"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '8px',
+              margin: '8px 0',
+              background: 'rgba(212, 165, 116, 0.1)',
+              border: '1px dashed rgba(212, 165, 116, 0.3)',
+              borderRadius: '4px',
+              color: 'var(--ink-brown)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(212, 165, 116, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'rgba(212, 165, 116, 0.1)';
+            }}
+          >
+            显示更多任务 ({tasks.length - visibleTaskLimit} 个)
+          </button>
+        )}
       </div>
  
       {/* 添加任务提示 */}
