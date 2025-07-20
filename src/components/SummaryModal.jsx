@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useTasks } from '@/hooks/useTasks';
-import { useTaskLists } from '@/hooks/useTaskLists';
+import { useTaskStore } from '@/stores/taskStore';
 
 const QUADRANT_NAMES = {
   1: '重要且紧急',
@@ -12,8 +11,7 @@ const QUADRANT_NAMES = {
 };
 
 export default function SummaryModal({ isVisible, onClose }) {
-  const { activeList } = useTaskLists();
-  const { tasks } = useTasks(activeList?.id);
+  const { tasks } = useTaskStore();
 
   const completedTasks = useMemo(() => {
     if (!tasks) return [];

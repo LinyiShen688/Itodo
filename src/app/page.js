@@ -4,17 +4,23 @@ import { useEffect } from 'react';
 import Header from '@/components/Header';
 import QuadrantGrid from '@/components/QuadrantGrid';
 import Sidebar from '@/components/Sidebar';
-import { useTaskLists } from '@/hooks/useTaskLists';
 import { useTrashStore } from '@/stores/trashStore';
+import { useTaskStore } from '@/stores/taskStore';
+import { useTaskListStore } from '@/stores/taskListStore';
 
 export default function Home() {
-  const { activeList, loading: listsLoading } = useTaskLists();
+  const { activeList, loading: listsLoading } = useTaskListStore();
   const initializeTrashStore = useTrashStore((state) => state.initializeTrashStore);
+  const initializeTaskListStore = useTaskListStore((state) => state.initialize);
 
-  // 初始化Zustand store
+  // 初始化Zustand stores
   useEffect(() => {
-    initializeTrashStore();
-  }, [initializeTrashStore]);
+    const initStores = async () => {
+      await initializeTrashStore();
+      await initializeTaskListStore();
+    };
+    initStores();
+  }, [initializeTrashStore, initializeTaskListStore]);
 
   if (listsLoading) {
     return (

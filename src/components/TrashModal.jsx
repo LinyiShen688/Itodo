@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTrash } from '@/hooks/useTrash';
-import { useTaskLists } from '@/hooks/useTaskLists';
+import { useTaskListStore } from '@/stores/taskListStore';
 import { useTrashStore } from '@/stores/trashStore';
 
 const QUADRANT_NAMES = {
@@ -14,7 +14,7 @@ const QUADRANT_NAMES = {
 
 export default function TrashModal({ isOpen, onClose }) {
   const { deletedTasks, loading, restoreTask, permanentDeleteTask, clearTrash, loadDeletedTasks } = useTrash();
-  const { taskLists } = useTaskLists();
+  const { taskLists } = useTaskListStore();
   const { decrementDeletedCount, decrementDeletedCountBy, resetDeletedCount } = useTrashStore();
   const [selectedTasks, setSelectedTasks] = useState(new Set());
 

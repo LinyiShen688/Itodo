@@ -10,7 +10,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="zh-CN">
-      <body>
+      <body suppressHydrationWarning={true}>
         <ThemeProvider>
           <AppSettingsProvider>{children}</AppSettingsProvider>
         </ThemeProvider>

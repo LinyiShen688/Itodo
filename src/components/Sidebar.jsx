@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useTaskLists } from '@/hooks/useTaskLists';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { useTrashStore } from '@/stores/trashStore';
+import { useTaskListStore } from '@/stores/taskListStore';
 import IOSToggle from './IOSToggle';
 import TrashModal from './TrashModal';
 
@@ -20,14 +20,14 @@ export default function Sidebar() {
   const { isOpen, setIsOpen } = useSidebarState();
   const { theme, setTheme } = useTheme();
   const { defaultLayoutMode, defaultShowETA, toggleDefaultLayoutMode, toggleDefaultShowETA } = useAppSettings();
-  const {
-    taskLists,
-    activeList,
-    addTaskList,
-    updateTaskList,
-    setActiveList,
-    deleteTaskList
-  } = useTaskLists();
+  const { 
+    taskLists, 
+    activeList, 
+    addTaskList, 
+    updateTaskList, 
+    setActiveList, 
+    deleteTaskList 
+  } = useTaskListStore();
   const { deletedTaskCount, updateDeletedTaskCount } = useTrashStore();
 
   const [editingId, setEditingId] = useState(null);
@@ -127,6 +127,7 @@ export default function Sidebar() {
       setIsOpen(false);
     } catch (error) {
       console.error('Failed to set active list:', error);
+      alert('切换任务列表失败，请重试');
     }
   };
 

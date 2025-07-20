@@ -1,11 +1,9 @@
 'use client';
 
-import { useTasks } from '@/hooks/useTasks';
-import { useTaskLists } from '@/hooks/useTaskLists';
+import { useTaskStore } from '@/stores/taskStore';
 
 export default function FAB() {
-  const { activeList } = useTaskLists();
-  const { addTask } = useTasks(activeList?.id);
+  const { addTask } = useTaskStore();
 
   const handleAddTask = async () => {
     try {

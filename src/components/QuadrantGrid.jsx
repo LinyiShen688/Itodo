@@ -3,8 +3,8 @@
 import React from 'react';
 import Quadrant from './Quadrant';
 import DragContext from './DragContext';
-import { useTasks } from '@/hooks/useTasks';
-import { useTaskLists } from '@/hooks/useTaskLists';
+import { useTaskStore } from '@/stores/taskStore';
+import { useTaskListStore } from '@/stores/taskListStore';
 import { arrayMove } from '@dnd-kit/sortable';
 
 const QUADRANT_CONFIG = [
@@ -53,8 +53,19 @@ const MemoizedQuadrant = React.memo(Quadrant, (prevProps, nextProps) => {
 });
 
 export default function QuadrantGrid() {
-  const { activeList } = useTaskLists();
-  const { tasks, loading, error, addTask, updateTask, deleteTask, toggleComplete, updateTaskText, moveTask, reorderTasks } = useTasks(activeList?.id);
+  const { activeList } = useTaskListStore();
+  const { 
+    tasks, 
+    loading, 
+    error, 
+    addTask, 
+    updateTask, 
+    deleteTask, 
+    toggleComplete, 
+    updateTaskText, 
+    moveTask, 
+    reorderTasks 
+  } = useTaskStore();
 
   // 布局与显示时间配置（向后兼容）
   const layoutMode = activeList?.layoutMode || 'FOUR'; // 'FOUR' | 'SINGLE'
