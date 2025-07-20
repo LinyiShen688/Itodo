@@ -10,6 +10,7 @@ import {
   moveTaskToQuadrant,
   reorderTasks
 } from '@/lib/indexeddb';
+import { useTrashStore } from '@/stores/trashStore';
 
 export function useTasks(listId = 'today') {
   const [tasks, setTasks] = useState({
@@ -21,6 +22,7 @@ export function useTasks(listId = 'today') {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentListId, setCurrentListId] = useState(listId);
+  const incrementDeletedCount = useTrashStore((state) => state.incrementDeletedCount);
 
   // 加载任务
   const loadTasks = useCallback(async (forceLoading = false) => {
@@ -150,12 +152,15 @@ export function useTasks(listId = 'today') {
         
         return newTasks;
       });
+
+      // 更新收纳箱计数
+      incrementDeletedCount();
     } catch (err) {
       console.error('Failed to delete task:', err);
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [incrementDeletedCount]);
 
   // 移动任务到不同象限
   const handleMoveTask = useCallback(async (taskId, fromQuadrant, toQuadrant, newOrder = 0) => {

@@ -5,7 +5,9 @@ import { useTaskLists } from '@/hooks/useTaskLists';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings } from '@/hooks/useAppSettings';
+import { useTrashStore } from '@/stores/trashStore';
 import IOSToggle from './IOSToggle';
+import TrashModal from './TrashModal';
 
 const THEME_OPTIONS = [
   { value: 'minimal', label: '简约' },
@@ -26,11 +28,13 @@ export default function Sidebar() {
     setActiveList,
     deleteTaskList
   } = useTaskLists();
+  const { deletedTaskCount, updateDeletedTaskCount } = useTrashStore();
 
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newListName, setNewListName] = useState('');
+  const [showTrashModal, setShowTrashModal] = useState(false);
   
   const editInputRef = useRef(null);
   const createInputRef = useRef(null);
@@ -147,6 +151,11 @@ export default function Sidebar() {
     setTheme(e.target.value);
   };
 
+  // 打开收纳箱
+  const handleOpenTrash = () => {
+    setShowTrashModal(true);
+  };
+
   // 自动聚焦输入框
   useEffect(() => {
     if (isCreating && createInputRef.current) {
@@ -160,6 +169,13 @@ export default function Sidebar() {
       editInputRef.current.select();
     }
   }, [editingId]);
+
+  // 当侧边栏打开时重新加载收纳箱数据
+  useEffect(() => {
+    if (isOpen) {
+      updateDeletedTaskCount();
+    }
+  }, [isOpen, updateDeletedTaskCount]);
 
   return (
     <>
@@ -244,6 +260,16 @@ export default function Sidebar() {
           />
         </div>
 
+        <h2>收纳箱</h2>
+        <div className="trash-section">
+          <button 
+            className="sidebar-item trash-btn"
+            onClick={handleOpenTrash}
+          >
+            🗑️ 收纳箱 {deletedTaskCount > 0 && <span className="trash-count">({deletedTaskCount})</span>}
+          </button>
+        </div>
+
         <h2>主题</h2>
         <div className="theme-selector">
           <select value={theme} onChange={handleThemeChange}>
@@ -260,6 +286,12 @@ export default function Sidebar() {
       <button className="sidebar-toggle" onClick={toggleSidebar}>
         {/* <span>任务</span> */}
       </button>
+
+      {/* 收纳箱模态框 */}
+      <TrashModal 
+        isOpen={showTrashModal} 
+        onClose={() => setShowTrashModal(false)} 
+      />
     </>
   );
 } 

@@ -1,12 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import Header from '@/components/Header';
 import QuadrantGrid from '@/components/QuadrantGrid';
 import Sidebar from '@/components/Sidebar';
 import { useTaskLists } from '@/hooks/useTaskLists';
+import { useTrashStore } from '@/stores/trashStore';
 
 export default function Home() {
   const { activeList, loading: listsLoading } = useTaskLists();
+  const initializeTrashStore = useTrashStore((state) => state.initializeTrashStore);
+
+  // 初始化Zustand store
+  useEffect(() => {
+    initializeTrashStore();
+  }, [initializeTrashStore]);
 
   if (listsLoading) {
     return (

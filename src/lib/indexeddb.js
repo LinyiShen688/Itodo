@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'iTodoApp';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORES = {
   TASKS: 'tasks',
@@ -20,6 +20,7 @@ export async function initDB() {
         taskStore.createIndex('quadrant', 'quadrant');
         taskStore.createIndex('listId', 'listId');
         taskStore.createIndex('completed', 'completed');
+        taskStore.createIndex('deleted', 'deleted');
         taskStore.createIndex('createdAt', 'createdAt');
       }
 
@@ -45,6 +46,30 @@ export async function initDB() {
             const task = cursor.value;
             if (!task.hasOwnProperty('estimatedTime')) {
               task.estimatedTime = '';
+              cursor.update(task);
+            }
+            cursor.continue();
+          }
+        };
+      }
+
+      // 版本3升级：添加deleted字段和索引
+      if (oldVersion < 3 && db.objectStoreNames.contains(STORES.TASKS)) {
+        const taskStore = transaction.objectStore(STORES.TASKS);
+        
+        // 添加deleted索引（如果不存在）
+        if (!taskStore.indexNames.contains('deleted')) {
+          taskStore.createIndex('deleted', 'deleted');
+        }
+        
+        // 为现有任务添加 deleted 字段
+        const request = taskStore.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const task = cursor.value;
+            if (!task.hasOwnProperty('deleted')) {
+              task.deleted = 0; // 0表示未删除，1表示已删除
               cursor.update(task);
             }
             cursor.continue();
@@ -193,13 +218,16 @@ export function generateId() {
 
 // === 任务操作 ===
 
-// 获取所有任务（按象限和顺序排序）
-export async function getAllTasks(listId = 'today') {
+// 获取所有任务（按象限和顺序排序，默认过滤已删除任务）
+export async function getAllTasks(listId = 'today', includeDeleted = false) {
   const db = await initDB();
   const tasks = await db.getAllFromIndex(STORES.TASKS, 'listId', listId);
   
+  // 过滤已删除的任务（除非明确要求包含）
+  const filteredTasks = includeDeleted ? tasks : tasks.filter(task => !task.deleted);
+  
   // 按象限和order排序
-  return tasks.sort((a, b) => {
+  return filteredTasks.sort((a, b) => {
     if (a.quadrant !== b.quadrant) {
       return a.quadrant - b.quadrant;
     }
@@ -208,12 +236,12 @@ export async function getAllTasks(listId = 'today') {
 }
 
 // 获取指定象限的任务
-export async function getTasksByQuadrant(quadrant, listId = 'today') {
+export async function getTasksByQuadrant(quadrant, listId = 'today', includeDeleted = false) {
   const db = await initDB();
   const allTasks = await db.getAllFromIndex(STORES.TASKS, 'listId', listId);
   
   return allTasks
-    .filter(task => task.quadrant === quadrant)
+    .filter(task => task.quadrant === quadrant && (includeDeleted || !task.deleted))
     .sort((a, b) => a.order - b.order);
 }
 
@@ -225,6 +253,7 @@ export async function addTask(taskData) {
     id: generateId(),
     text: taskData.text || '',
     completed: 0, // false
+    deleted: 0, // false
     quadrant: taskData.quadrant || 1,
     listId: taskData.listId || 'today',
     estimatedTime: taskData.estimatedTime || '',
@@ -256,10 +285,40 @@ export async function updateTask(id, updates) {
   return updatedTask;
 }
 
-// 删除任务
+// 软删除任务（移到收纳箱）
 export async function deleteTask(id) {
+  return await updateTask(id, { deleted: 1 });
+}
+
+// 硬删除任务（永久删除）
+export async function permanentDeleteTask(id) {
   const db = await initDB();
   await db.delete(STORES.TASKS, id);
+}
+
+// 恢复已删除的任务
+export async function restoreTask(id) {
+  return await updateTask(id, { deleted: 0 });
+}
+
+// 获取已删除的任务（收纳箱）
+export async function getDeletedTasks(listId = 'today') {
+  const db = await initDB();
+  const allTasks = await db.getAllFromIndex(STORES.TASKS, 'listId', listId);
+  
+  return allTasks
+    .filter(task => task.deleted === 1)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)); // 按删除时间倒序
+}
+
+// 获取所有列表的已删除任务
+export async function getAllDeletedTasks() {
+  const db = await initDB();
+  const allTasks = await db.getAll(STORES.TASKS);
+  
+  return allTasks
+    .filter(task => task.deleted === 1)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)); // 按删除时间倒序
 }
 
 // 移动任务到不同象限
