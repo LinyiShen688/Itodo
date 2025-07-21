@@ -140,46 +140,58 @@ export default function TrashModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content trash-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>🗑️ 收纳箱</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" onClick={onClose}>
+      <div className="w-full max-w-6xl max-h-[90vh] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* 头部 */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
+          <h2 className="text-xl font-semibold text-gray-900">🗑️ 收纳箱</h2>
+          <button 
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors" 
+            onClick={onClose}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        <div className="modal-body">
+        {/* 内容区域 */}
+        <div className="flex-1 p-6 overflow-y-auto">
           {loading ? (
-            <div className="loading">加载中...</div>
+            <div className="flex items-center justify-center h-32">
+              <div className="text-gray-500">加载中...</div>
+            </div>
           ) : deletedTasks.length === 0 ? (
-            <div className="empty-trash">
-              <div className="empty-icon">🗑️</div>
-              <p>收纳箱是空的</p>
-              <small>删除的任务会先存放在这里</small>
+            <div className="flex flex-col items-center justify-center h-32 text-center">
+              <div className="text-4xl mb-4">🗑️</div>
+              <p className="text-gray-600 text-lg mb-2">收纳箱是空的</p>
+              <small className="text-gray-400">删除的任务会先存放在这里</small>
             </div>
           ) : (
             <>
-              <div className="trash-actions">
-                <div className="left-actions">
-                  <label className="select-all">
-                    <input
-                      type="checkbox"
-                      checked={selectedTasks.size === deletedTasks.length && deletedTasks.length > 0}
-                      onChange={handleSelectAll}
-                    />
-                    全选 ({deletedTasks.length})
-                  </label>
+              {/* 操作栏 */}
+              <div className="flex items-center justify-between mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">
+                    共 {deletedTasks.length} 项任务
+                  </span>
+                  {selectedTasks.size > 0 && (
+                    <span className="text-sm text-blue-600">
+                      已选择 {selectedTasks.size} 项
+                    </span>
+                  )}
                 </div>
-                <div className="right-actions">
+                <div className="flex items-center space-x-2">
                   {selectedTasks.size > 0 && (
                     <>
                       <button 
-                        className="btn-restore"
+                        className="px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"
                         onClick={handleRestoreSelected}
                       >
                         恢复选中 ({selectedTasks.size})
                       </button>
                       <button 
-                        className="btn-delete"
+                        className="px-4 py-2 text-sm font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
                         onClick={handleDeleteSelected}
                       >
                         永久删除选中
@@ -187,7 +199,7 @@ export default function TrashModal({ isOpen, onClose }) {
                     </>
                   )}
                   <button 
-                    className="btn-clear-all"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
                     onClick={handleClearAll}
                   >
                     清空收纳箱
@@ -195,52 +207,120 @@ export default function TrashModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              <div className="trash-tasks">
-                {deletedTasks.map((task) => (
-                  <div 
-                    key={task.id} 
-                    className={`trash-task ${selectedTasks.has(task.id) ? 'selected' : ''}`}
-                  >
-                    <label className="task-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={selectedTasks.has(task.id)}
-                        onChange={() => handleTaskSelect(task.id)}
-                      />
-                    </label>
-                    
-                    <div className="task-content">
-                      <div className="task-text">{task.text}</div>
-                      <div className="task-meta">
-                        <span className="task-list">{taskListMap[task.listId] || '未知列表'}</span>
-                        <span className="task-quadrant">{QUADRANT_NAMES[task.quadrant]}</span>
-                        {task.estimatedTime && (
-                          <span className="task-eta">{task.estimatedTime}</span>
-                        )}
-                        <span className="delete-time">
-                          删除于 {new Date(task.updatedAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="task-actions">
-                      <button 
-                        className="btn-restore-single"
-                        onClick={() => handleRestoreTask(task.id)}
-                        title="恢复任务"
+              {/* 任务表格 */}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] bg-white border border-gray-200 rounded-lg">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="w-12 px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.size === deletedTasks.length && deletedTasks.length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">任务名</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">归属项目</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">归属象限</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">创建时间</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">完成时间</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">删除时间</th>
+                      <th className="w-24 px-4 py-3 text-center text-sm font-medium text-gray-700">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {deletedTasks.map((task) => (
+                      <tr 
+                        key={task.id} 
+                        className={`hover:bg-gray-50 transition-colors ${
+                          selectedTasks.has(task.id) ? 'bg-blue-50' : ''
+                        }`}
                       >
-                        ↩️
-                      </button>
-                      <button 
-                        className="btn-delete-single"
-                        onClick={() => handlePermanentDeleteTask(task.id)}
-                        title="永久删除"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedTasks.has(task.id)}
+                            onChange={() => handleTaskSelect(task.id)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-900 font-medium truncate max-w-xs" title={task.text}>
+                            {task.text}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-600">
+                            {taskListMap[task.listId] || '未知列表'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            task.quadrant === 1 ? 'bg-red-100 text-red-800' :
+                            task.quadrant === 2 ? 'bg-blue-100 text-blue-800' :
+                            task.quadrant === 3 ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {QUADRANT_NAMES[task.quadrant]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {task.createdAt ? new Date(task.createdAt).toLocaleDateString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {task.completed && task.completedAt 
+                            ? new Date(task.completedAt).toLocaleDateString('zh-CN', {
+                                year: 'numeric',
+                                month: '2-digit', 
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : task.completed ? '已完成' : '未完成'
+                          }
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {new Date(task.updatedAt).toLocaleDateString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit', 
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button 
+                              className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                              onClick={() => handleRestoreTask(task.id)}
+                              title="恢复任务"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                            </button>
+                            <button 
+                              className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                              onClick={() => handlePermanentDeleteTask(task.id)}
+                              title="永久删除"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
