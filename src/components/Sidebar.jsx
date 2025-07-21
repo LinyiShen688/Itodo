@@ -8,6 +8,7 @@ import { useTrashStore } from '@/stores/trashStore';
 import { useTaskListStore } from '@/stores/taskListStore';
 import IOSToggle from './IOSToggle';
 import TrashModal from './TrashModal';
+import ListItemMenu from './ListItemMenu';
 
 const THEME_OPTIONS = [
   { value: 'minimal', label: '简约' },
@@ -30,13 +31,10 @@ export default function Sidebar() {
   } = useTaskListStore();
   const { deletedTaskCount, updateDeletedTaskCount } = useTrashStore();
 
-  const [editingId, setEditingId] = useState(null);
-  const [editingText, setEditingText] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [showTrashModal, setShowTrashModal] = useState(false);
   
-  const editInputRef = useRef(null);
   const createInputRef = useRef(null);
 
   // 切换侧边栏
@@ -85,37 +83,13 @@ export default function Sidebar() {
     }
   };
 
-  // 开始编辑任务列表
-  const startEditingTaskList = (list) => {
-    setEditingId(list.id);
-    setEditingText(list.name);
-  };
-
-  // 完成编辑任务列表
-  const finishEditingTaskList = async () => {
-    if (editingText.trim() && editingText.trim() !== taskLists.find(l => l.id === editingId)?.name) {
-      try {
-        await updateTaskList(editingId, { name: editingText.trim() });
-      } catch (error) {
-        console.error('Failed to update task list:', error);
-      }
-    }
-    setEditingId(null);
-    setEditingText('');
-  };
-
-  // 取消编辑
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditingText('');
-  };
-
-  // 处理编辑输入
-  const handleEditKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      finishEditingTaskList();
-    } else if (e.key === 'Escape') {
-      cancelEditing();
+  // 重命名任务列表
+  const handleRenameTaskList = async (listId, newName) => {
+    try {
+      await updateTaskList(listId, { name: newName });
+    } catch (error) {
+      console.error('Failed to rename task list:', error);
+      alert('重命名失败，请重试');
     }
   };
 
@@ -164,13 +138,6 @@ export default function Sidebar() {
     }
   }, [isCreating]);
 
-  useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
-    }
-  }, [editingId]);
-
   // 当侧边栏打开时重新加载收纳箱数据
   useEffect(() => {
     if (isOpen) {
@@ -186,63 +153,68 @@ export default function Sidebar() {
           ✕
         </button>
         
-        <h2>任务列表</h2>
-        
-        {/* 创建新任务列表按钮 */}
-        {!isCreating ? (
+        {/* 任务列表标题和添加按钮 */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-gray-800">任务列表</h2>
           <button 
-            className="sidebar-item create-task-btn"
+            className="
+              flex items-center justify-center w-6 h-6
+              bg-transparent hover:bg-gray-100 active:bg-gray-200
+              rounded-full transition-all duration-200
+              text-gray-500 hover:text-gray-700
+              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+            "
             onClick={startCreatingTaskList}
+            aria-label="创建新任务列表"
           >
-            ＋ 创建新任务列表
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
           </button>
-        ) : (
-          <div className="sidebar-item editable">
-            <input
-              ref={createInputRef}
-              type="text"
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-              onKeyDown={handleCreateKeyDown}
-              onBlur={finishCreatingTaskList}
-              placeholder="输入任务列表名称..."
-            />
-          </div>
-        )}
+        </div>
         
         {/* 任务列表 */}
-        <div className="sidebar-tasks">
+        <div className="space-y-1 mb-6">
+          {/* 创建中的新列表行 */}
+          {isCreating && (
+            <div className="group px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+              <input
+                ref={createInputRef}
+                type="text"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                onKeyDown={handleCreateKeyDown}
+                onBlur={finishCreatingTaskList}
+                placeholder="输入任务列表名称..."
+                className="
+                  w-full bg-transparent border-none outline-none
+                  text-gray-700 placeholder-gray-400
+                  focus:ring-0 p-0
+                "
+              />
+            </div>
+          )}
+          
+          {/* 现有任务列表 */}
           {taskLists.map((list) => (
             <div
               key={list.id}
-              className={`sidebar-item ${list.isActive ? 'active' : ''} ${editingId === list.id ? 'editable' : ''}`}
+              className={`
+                group px-3 py-2 rounded-lg cursor-pointer transition-all duration-200
+                ${list.isActive 
+                  ? 'bg-blue-500 text-white shadow-sm' 
+                  : 'hover:bg-gray-100 text-gray-700'
+                }
+              `}
+              onClick={() => handleSetActiveList(list)}
             >
-              {editingId === list.id ? (
-                <input
-                  ref={editInputRef}
-                  type="text"
-                  value={editingText}
-                  onChange={(e) => setEditingText(e.target.value)}
-                  onKeyDown={handleEditKeyDown}
-                  onBlur={finishEditingTaskList}
-                />
-              ) : (
-                <>
-                  <span
-                    className="sidebar-item-text"
-                    onClick={() => handleSetActiveList(list)}
-                    onDoubleClick={() => startEditingTaskList(list)}
-                  >
-                    {list.name}
-                  </span>
-                  <span
-                    className="sidebar-item-delete"
-                    onClick={() => handleDeleteTaskList(list.id)}
-                  >
-                    ×
-                  </span>
-                </>
-              )}
+              <ListItemMenu
+                list={list}
+                onRename={handleRenameTaskList}
+                onDelete={handleDeleteTaskList}
+                isActive={list.isActive}
+              />
             </div>
           ))}
         </div>
