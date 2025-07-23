@@ -9,6 +9,8 @@ import { useTaskListStore } from '@/stores/taskListStore';
 import IOSToggle from './IOSToggle';
 import TrashModal from './TrashModal';
 import ListItemMenu from './ListItemMenu';
+import AIAnalysis from './AIAnalysis';
+import { useTrash } from '@/hooks/useTrash';
 
 const THEME_OPTIONS = [
   { value: 'minimal', label: '简约' },
@@ -30,6 +32,7 @@ export default function Sidebar() {
     deleteTaskList 
   } = useTaskListStore();
   const { deletedTaskCount, updateDeletedTaskCount } = useTrashStore();
+  const { deletedTasks } = useTrash();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newListName, setNewListName] = useState('');
@@ -242,6 +245,12 @@ export default function Sidebar() {
             🗑️ 收纳箱 {deletedTaskCount > 0 && <span className="trash-count">({deletedTaskCount})</span>}
           </button>
         </div>
+
+        {/* AI分析模块 */}
+        <AIAnalysis 
+          deletedTasks={deletedTasks} 
+          taskLists={taskLists}
+        />
 
         <h2>主题</h2>
         <div className="theme-selector">

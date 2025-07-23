@@ -899,6 +899,14 @@ body.dragging-active {
   z-index: 1000;
 }
 
+/* 主内容区域推移效果 - 桌面端 */
+@media (min-width: 768px) {
+  body.sidebar-open {
+    margin-left: 300px;
+    transition: margin-left 0.3s ease;
+  }
+}
+
 /* 侧边栏样式 */
 .sidebar {
   position: fixed;
@@ -915,8 +923,41 @@ body.dragging-active {
   padding: 2rem 1.5rem;
 }
 
-.sidebar.open {
-  left: 0;
+/* 桌面端侧边栏 - 推拉式 */
+@media (min-width: 768px) {
+  .sidebar {
+    left: -300px;
+    transition: left 0.3s ease;
+  }
+  
+  .sidebar.open {
+    left: 0;
+  }
+}
+
+/* 移动端侧边栏 - 悬浮式 */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    left: -300px;
+    z-index: 1000; /* 确保在移动端有更高的层级 */
+  }
+  
+  .sidebar.open {
+    left: 0;
+  }
+  
+  /* 移动端侧边栏打开时的遮罩 */
+  .sidebar.open::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 300px;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
 }
 
 /* 简约主题的侧边栏样式 */
@@ -976,7 +1017,7 @@ body.dragging-active {
   transform: rotate(90deg);
 }
 
-/* 侧边栏切换按钮 */
+/* 侧边栏切换按钮 - 基础样式 */
 .sidebar-toggle {
   position: fixed;
   left: 0;
@@ -1014,21 +1055,52 @@ body.dragging-active {
   writing-mode: initial;
 }
 
-/* 侧边栏打开时的切换按钮样式 */
-.sidebar.open ~ .sidebar-toggle {
-  left: 300px;
-  background: var(--ink-brown);
-  color: white;
-  border-radius: 24px 0 0 24px;
+/* 桌面端切换按钮 - 推拉式 */
+@media (min-width: 768px) {
+  .sidebar-toggle {
+    transition: left 0.3s ease, width 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  /* 桌面端侧边栏打开时按钮位置 */
+  body.sidebar-open .sidebar-toggle {
+    left: 300px;
+    background: var(--ink-brown);
+    color: white;
+    border-radius: 24px 0 0 24px;
+  }
+  
+  body.sidebar-open .sidebar-toggle::before {
+    content: '◀';
+    font-size: 1.2rem;
+  }
+  
+  body.sidebar-open .sidebar-toggle span {
+    display: none;
+  }
 }
 
-.sidebar.open ~ .sidebar-toggle::before {
-  content: '◀';
-  font-size: 1.2rem;
-}
+/* 移动端切换按钮 - 悬浮式 */
+@media (max-width: 767px) {
+  .sidebar-toggle {
+    z-index: 999; /* 确保在移动端层级正确 */
+  }
+  
+  /* 移动端侧边栏打开时的切换按钮样式 */
+  .sidebar.open ~ .sidebar-toggle {
+    left: 300px;
+    background: var(--ink-brown);
+    color: white;
+    border-radius: 24px 0 0 24px;
+  }
 
-.sidebar.open ~ .sidebar-toggle span {
-  display: none;
+  .sidebar.open ~ .sidebar-toggle::before {
+    content: '◀';
+    font-size: 1.2rem;
+  }
+
+  .sidebar.open ~ .sidebar-toggle span {
+    display: none;
+  }
 }
 
 /* 侧边栏标题 */
@@ -1303,6 +1375,53 @@ body.dragging-active {
 /* 收纳箱样式 */
 .trash-section {
   margin-top: 1rem;
+}
+
+/* AI分析模块样式 */
+.ai-analysis-section {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ai-analysis-section h2 {
+  font-family: 'Caveat', cursive;
+  font-size: 1.5rem;
+  color: var(--ink-brown);
+  margin-bottom: 1rem;
+  margin-top: 0;
+}
+
+.quick-stats {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.ai-analyze-btn:hover:not(:disabled) {
+  background: var(--ink-brown) !important;
+  transform: translateX(2px);
+}
+
+.analysis-result {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.analysis-result ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.analysis-result li {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.analysis-result li::before {
+  content: '•';
+  color: var(--accent-gold);
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 .trash-btn {

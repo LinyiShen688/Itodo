@@ -11,7 +11,8 @@
       "Bash(npm test)",
       "Bash(npm test:*)",
       "Bash(touch:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:docs.siliconflow.cn)"
     ],
     "deny": []
   }
