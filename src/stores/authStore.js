@@ -84,34 +84,139 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // 发送 Magic Link 登录邮件
-  signInWithEmail: async (email) => {
+  // 邮箱密码登录
+  signInWithPassword: async (email, password, rememberMe = false) => {
     try {
       set({ loading: true, error: null });
       const supabase = createClient();
       
-      const { error } = await supabase.auth.signInWithOtp({
+      const options = {};
+      if (rememberMe) {
+        // 记住登录状态，设置更长的session过期时间
+        options.persistSession = true;
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        options: {
-          // 可以自定义重定向URL
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+        password,
+        options
       });
 
       if (error) {
-        console.error('发送登录邮件失败:', error);
+        console.error('登录失败:', error);
         set({ error: error.message });
-        toast.error('发送登录邮件失败: ' + error.message);
+        
+        // 提供更友好的错误提示
+        let errorMessage = '登录失败';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = '邮箱或密码错误';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = '请先验证您的邮箱';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = '登录尝试过于频繁，请稍后再试';
+        }
+        
+        toast.error(errorMessage);
         return false;
       }
 
-      toast.success('登录邮件已发送，请检查您的邮箱');
+      toast.success('登录成功');
       return true;
 
     } catch (error) {
       console.error('登录请求失败:', error);
       set({ error: error.message });
       toast.error('登录请求失败');
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  // 用户注册
+  signUp: async (email, password) => {
+    try {
+      set({ loading: true, error: null });
+      const supabase = createClient();
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/?confirmed=true`,
+        },
+      });
+
+      if (error) {
+        console.error('注册失败:', error);
+        set({ error: error.message });
+        
+        // 提供更友好的错误提示
+        let errorMessage = '注册失败';
+        if (error.message.includes('User already registered')) {
+          errorMessage = '该邮箱已注册，请直接登录';
+        } else if (error.message.includes('Password should be at least')) {
+          errorMessage = '密码至少需要6位字符';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = '请输入有效的邮箱地址';
+        }
+        
+        toast.error(errorMessage);
+        return false;
+      }
+
+      // 如果需要邮箱验证
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.success('注册成功！请检查您的邮箱并点击验证链接');
+      } else {
+        toast.success('注册成功！');
+      }
+      
+      return true;
+
+    } catch (error) {
+      console.error('注册请求失败:', error);
+      set({ error: error.message });
+      toast.error('注册请求失败');
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  // 密码重置
+  resetPassword: async (email) => {
+    try {
+      set({ loading: true, error: null });
+      const supabase = createClient();
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('发送重置邮件失败:', error);
+        set({ error: error.message });
+        
+        // 提供更友好的错误提示
+        let errorMessage = '发送重置邮件失败';
+        if (error.message.includes('Invalid email')) {
+          errorMessage = '请输入有效的邮箱地址';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = '请求过于频繁，请稍后再试';
+        }
+        
+        toast.error(errorMessage);
+        return false;
+      }
+
+      toast.success('密码重置邮件已发送，请检查您的邮箱');
+      return true;
+
+    } catch (error) {
+      console.error('密码重置请求失败:', error);
+      set({ error: error.message });
+      toast.error('密码重置请求失败');
       return false;
     } finally {
       set({ loading: false });

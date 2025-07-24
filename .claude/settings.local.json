@@ -12,7 +12,10 @@
       "Bash(npm test:*)",
       "Bash(touch:*)",
       "Bash(mv:*)",
-      "WebFetch(domain:docs.siliconflow.cn)"
+      "WebFetch(domain:docs.siliconflow.cn)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
