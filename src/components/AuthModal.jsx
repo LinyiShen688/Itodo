@@ -15,7 +15,17 @@ export default function AuthModal({ isOpen, onClose }) {
   const [isResetMode, setIsResetMode] = useState(false);
   
   const emailInputRef = useRef(null);
-  const { signInWithPassword, signUp, resetPassword, loading, error } = useAuthStore();
+  const { 
+    signInWithPassword, 
+    signUp, 
+    resetPassword, 
+    loading, 
+    error,
+    rememberedEmail,
+    rememberedPassword,
+    isRememberMeEnabled,
+    clearRememberedCredentials
+  } = useAuthStore();
 
   // 自动聚焦邮箱输入框
   useEffect(() => {
@@ -23,6 +33,29 @@ export default function AuthModal({ isOpen, onClose }) {
       emailInputRef.current.focus();
     }
   }, [isOpen]);
+
+  // 自动填充记住的登录信息
+  useEffect(() => {
+    if (isOpen && isLogin && !isResetMode) {
+      if (rememberedEmail) {
+        setEmail(rememberedEmail);
+      }
+      if (rememberedPassword && isRememberMeEnabled) {
+        setPassword(rememberedPassword);
+        setRememberMe(true);
+      }
+    }
+  }, [isOpen, isLogin, isResetMode, rememberedEmail, rememberedPassword, isRememberMeEnabled]);
+
+  // 监听"记住我"状态变化，用户取消勾选时立即清除localStorage
+  const handleRememberMeChange = (checked) => {
+    setRememberMe(checked);
+    
+    // 如果用户取消了"记住我"，立即清除保存的登录信息
+    if (!checked && isRememberMeEnabled) {
+      clearRememberedCredentials();
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,11 +101,15 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   const handleClose = () => {
-    setEmail('');
-    setPassword('');
+    // 只在没有记住登录信息时清空表单
+    if (!isRememberMeEnabled || !rememberedEmail) {
+      setEmail('');
+      setPassword('');
+      setRememberMe(false);
+    }
+    
     setConfirmPassword('');
     setIsLogin(true);
-    setRememberMe(false);
     setShowPassword(false);
     setShowConfirmPassword(false);
     setIsResetMode(false);
@@ -80,11 +117,25 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   const switchMode = () => {
-    setIsLogin(!isLogin);
-    setPassword('');
+    const newIsLogin = !isLogin;
+    setIsLogin(newIsLogin);
+    
+    // 切换到登录模式时，恢复记住的信息
+    if (newIsLogin && isRememberMeEnabled) {
+      if (rememberedEmail) setEmail(rememberedEmail);
+      if (rememberedPassword) {
+        setPassword(rememberedPassword);
+        setRememberMe(true);
+      }
+    } else {
+      // 切换到其他模式时清空密码
+      setPassword('');
+      setRememberMe(false);
+    }
+    
     setConfirmPassword('');
     setShowPassword(false);
-    setShowConfirmPassword(false);
+    setShowConfirmPassword(false);  
     setIsResetMode(false);
   };
 
@@ -232,7 +283,7 @@ export default function AuthModal({ isOpen, onClose }) {
                   type="checkbox"
                   id="rememberMe"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={(e) => handleRememberMeChange(e.target.checked)}
                   className="h-4 w-4 text-[var(--accent-gold)] focus:ring-[var(--accent-gold)] border-[var(--ink-brown)]/20 rounded"
                 />
                 <label htmlFor="rememberMe" className="ml-2 block text-sm text-[var(--ink-brown)] font-['Noto_Serif_SC']">
@@ -305,13 +356,26 @@ export default function AuthModal({ isOpen, onClose }) {
                   </button>
                 </div>
                 {isLogin && (
-                  <div>
+                  <div className="space-y-1">
                     <button
                       onClick={enterResetMode}
-                      className="text-[var(--ink-brown)]/70 hover:text-[var(--ink-brown)] text-xs font-['Noto_Serif_SC']"
+                      className="text-[var(--ink-brown)]/70 hover:text-[var(--ink-brown)] text-xs font-['Noto_Serif_SC'] block"
                     >
                       忘记密码？
                     </button>
+                    {isRememberMeEnabled && (
+                      <button
+                        onClick={() => {
+                          clearRememberedCredentials();
+                          setEmail('');
+                          setPassword('');
+                          setRememberMe(false);
+                        }}
+                        className="text-[var(--ink-brown)]/70 hover:text-[var(--ink-brown)] text-xs font-['Noto_Serif_SC'] block"
+                      >
+                        忘记登录信息
+                      </button>
+                    )}
                   </div>
                 )}
               </>

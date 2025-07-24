@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from '@/utils/toast';
+import { encryptPassword, decryptPassword, STORAGE_KEYS } from '@/utils/encryption';
 
 export const useAuthStore = create((set, get) => ({
   // 状态
@@ -12,6 +13,11 @@ export const useAuthStore = create((set, get) => ({
   error: null,
   initialized: false,
   subscription: null,
+  
+  // 记住登录信息状态
+  rememberedEmail: '',
+  rememberedPassword: '',
+  isRememberMeEnabled: false,
 
   // 基础操作
   setLoading: (loading) => set({ loading }),
@@ -19,11 +25,73 @@ export const useAuthStore = create((set, get) => ({
   setUser: (user) => set({ user }),
   setSession: (session) => set({ session }),
 
+  // 记住登录信息操作
+  loadRememberedCredentials: () => {
+    try {
+      const rememberedEmail = localStorage.getItem(STORAGE_KEYS.REMEMBERED_EMAIL) || '';
+      const encryptedPassword = localStorage.getItem(STORAGE_KEYS.REMEMBERED_PASSWORD) || '';
+      const isRememberMeEnabled = localStorage.getItem(STORAGE_KEYS.REMEMBER_ME_ENABLED) === 'true';
+      
+      const rememberedPassword = encryptedPassword ? decryptPassword(encryptedPassword) : '';
+      
+      set({
+        rememberedEmail,
+        rememberedPassword,
+        isRememberMeEnabled,
+      });
+    } catch (error) {
+      console.error('加载记住的登录信息失败:', error);
+      // 清理可能损坏的数据
+      get().clearRememberedCredentials();
+    }
+  },
+
+  saveRememberedCredentials: (email, password, rememberMe) => {
+    try {
+      if (rememberMe) {
+        // 用户勾选了"记住我"，保存账户名密码到localStorage
+        localStorage.setItem(STORAGE_KEYS.REMEMBERED_EMAIL, email);
+        localStorage.setItem(STORAGE_KEYS.REMEMBERED_PASSWORD, encryptPassword(password));
+        localStorage.setItem(STORAGE_KEYS.REMEMBER_ME_ENABLED, 'true');
+        
+        set({
+          rememberedEmail: email,
+          rememberedPassword: password,
+          isRememberMeEnabled: true,
+        });
+      } else {
+        // 用户没勾选或取消了"记住我"，清除localStorage中的信息
+        get().clearRememberedCredentials();
+      }
+    } catch (error) {
+      console.error('保存记住的登录信息失败:', error);
+    }
+  },
+
+  clearRememberedCredentials: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+      localStorage.removeItem(STORAGE_KEYS.REMEMBERED_PASSWORD);
+      localStorage.removeItem(STORAGE_KEYS.REMEMBER_ME_ENABLED);
+      
+      set({
+        rememberedEmail: '',
+        rememberedPassword: '',
+        isRememberMeEnabled: false,
+      });
+    } catch (error) {
+      console.error('清理记住的登录信息失败:', error);
+    }
+  },
+
   // 初始化认证状态
   initialize: async () => {
     try {
       set({ loading: true, error: null });
       const supabase = createClient();
+      
+      // 加载记住的登录信息
+      get().loadRememberedCredentials();
       
       // 获取当前会话
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -119,6 +187,9 @@ export const useAuthStore = create((set, get) => ({
         toast.error(errorMessage);
         return false;
       }
+
+      // 登录成功后保存记住的登录信息
+      get().saveRememberedCredentials(email, password, rememberMe);
 
       toast.success('登录成功');
       return true;
@@ -244,6 +315,9 @@ export const useAuthStore = create((set, get) => ({
         session: null,
         error: null 
       });
+      
+      // 注意：退出登录时不清理记住的登录信息
+      // 记住的信息应该保留，让用户下次使用时自动填充
       
       return true;
 
