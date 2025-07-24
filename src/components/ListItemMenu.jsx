@@ -99,7 +99,7 @@ export default function ListItemMenu({
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={handleRenameKeyDown}
           onBlur={finishRenaming}
-          className="w-full px-2 py-1 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 py-1 text-sm bg-[var(--white-trans)] border border-[var(--accent-gold)]/30 rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent-gold)]/50 focus:border-[var(--accent-gold)] text-[var(--ink-brown)] font-['Noto_Serif_SC']"
           placeholder="输入列表名称..."
         />
       </div>
@@ -109,7 +109,7 @@ export default function ListItemMenu({
   return (
     <div className="flex items-center justify-between w-full group">
       {/* 列表名称 */}
-      <span className="flex-1 truncate text-left">
+      <span className="flex-1 truncate text-left font-['Noto_Serif_SC']">
         {list.name}
       </span>
       
@@ -119,8 +119,8 @@ export default function ListItemMenu({
           onClick={toggleMenu}
           className={`
             p-1 rounded-full transition-all duration-200 
-            ${isOpen ? 'bg-gray-200' : 'bg-transparent hover:bg-gray-100'}
-            ${isActive ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:text-gray-900'}
+            ${isOpen ? 'bg-[var(--parchment-dark)]' : 'bg-transparent hover:bg-[var(--parchment-dark)]'}
+            ${isActive ? 'text-white hover:bg-white/20' : 'text-[var(--ink-brown)]/70 hover:text-[var(--ink-brown)]'}
             opacity-0 group-hover:opacity-100 focus:opacity-100
             touch:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100
           `}
@@ -145,19 +145,19 @@ export default function ListItemMenu({
         {isOpen && (
           <div className={`
             absolute right-0 top-full mt-1 z-50
-            bg-white rounded-lg shadow-lg border border-gray-200
+            bg-[var(--parchment)] rounded-lg shadow-lg border border-[var(--accent-gold)]/20
             min-w-[120px] py-1
             animate-in fade-in duration-150
           `}>
             <button
               onClick={startRenaming}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
+              className="w-full px-4 py-2 text-left text-sm text-[var(--ink-brown)] hover:bg-[var(--parchment-dark)] transition-colors duration-150 font-['Noto_Serif_SC']"
             >
               重命名
             </button>
             <button
               onClick={handleDelete}
-              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50/50 transition-colors duration-150 font-['Noto_Serif_SC']"
             >
               删除
             </button>

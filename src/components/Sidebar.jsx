@@ -158,19 +158,22 @@ export default function Sidebar() {
         
         {/* 任务列表标题和添加按钮 */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-800">任务列表</h2>
+          <h2 className="mb-[0px] text-lg  font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC']">任务列表</h2>
           <button 
             className="
-              flex items-center justify-center w-6 h-6
-              bg-transparent hover:bg-gray-100 active:bg-gray-200
-              rounded-full transition-all duration-200
-              text-gray-500 hover:text-gray-700
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+              flex items-center justify-center w-8 h-8
+              bg-[var(--accent-gold)]/10 hover:bg-[var(--accent-gold)]/20 active:bg-[var(--accent-gold)]/30
+              border border-[var(--accent-gold)]/30 hover:border-[var(--accent-gold)]/50
+              rounded-lg transition-all duration-200
+              text-[var(--accent-gold)] hover:text-[var(--ink-brown)]
+              focus:outline-none focus:ring-2 focus:ring-[var(--accent-gold)]/50 focus:ring-offset-1
+              shadow-sm hover:shadow-md
             "
             onClick={startCreatingTaskList}
             aria-label="创建新任务列表"
+            title="新建任务列表"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -181,7 +184,7 @@ export default function Sidebar() {
         <div className="space-y-1 mb-6">
           {/* 创建中的新列表行 */}
           {isCreating && (
-            <div className="group px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+            <div className="group px-3 py-2 rounded-lg bg-[var(--white-trans)] border border-[var(--accent-gold)]/30 shadow-sm">
               <input
                 ref={createInputRef}
                 type="text"
@@ -192,8 +195,8 @@ export default function Sidebar() {
                 placeholder="输入任务列表名称..."
                 className="
                   w-full bg-transparent border-none outline-none
-                  text-gray-700 placeholder-gray-400
-                  focus:ring-0 p-0
+                  text-[var(--ink-brown)] placeholder-[var(--ink-brown)]/50
+                  focus:ring-0 p-0 font-['Noto_Serif_SC']
                 "
               />
             </div>
@@ -206,8 +209,8 @@ export default function Sidebar() {
               className={`
                 group px-3 py-2 rounded-lg cursor-pointer transition-all duration-200
                 ${list.isActive 
-                  ? 'bg-blue-500 text-white shadow-sm' 
-                  : 'hover:bg-gray-100 text-gray-700'
+                  ? 'bg-[var(--accent-gold)] text-white shadow-md border border-[var(--accent-gold)]' 
+                  : 'hover:bg-[var(--parchment-dark)] text-[var(--ink-brown)] border border-transparent'
                 }
               `}
               onClick={() => handleSetActiveList(list)}
@@ -222,7 +225,7 @@ export default function Sidebar() {
           ))}
         </div>
         
-        <h2>视图设置</h2>
+        <h2 className="text-lg font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC'] mb-3">视图设置</h2>
         <div className="flex flex-col gap-3 pb-4">
           <IOSToggle
             label="四象限模式"
@@ -236,7 +239,7 @@ export default function Sidebar() {
           />
         </div>
 
-        <h2>收纳箱</h2>
+        <h2 className="text-lg font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC'] mb-3">收纳箱</h2>
         <div className="trash-section">
           <button 
             className="sidebar-item trash-btn"
@@ -252,7 +255,7 @@ export default function Sidebar() {
           taskLists={taskLists}
         />
 
-        <h2>主题</h2>
+        <h2 className="text-lg font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC'] mb-3">主题</h2>
         <div className="theme-selector">
           <select value={theme} onChange={handleThemeChange}>
             {THEME_OPTIONS.map((option) => (
