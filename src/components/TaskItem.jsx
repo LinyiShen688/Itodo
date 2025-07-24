@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useDebounce } from '@/hooks/useDebounce';
 
 export default function TaskItem({
   task,
@@ -31,23 +30,7 @@ export default function TaskItem({
     }
   };
 
-  // 防抖的文本保存函数
-  const debouncedSaveText = useDebounce(async (text, estimatedTime) => {
-    const hasTextChanged = text.trim() !== task.text;
-    const hasTimeChanged = estimatedTime !== (task.estimatedTime || '');
-    
-    if (hasTextChanged || hasTimeChanged) {
-      try {
-        await onUpdateText(task.id, {
-          text: text.trim(),
-          estimatedTime: estimatedTime.trim()
-        });
-      } catch (error) {
-        console.error('Failed to auto-save task:', error);
-      }
-    }
-  }, 1000, [task.id, task.text, task.estimatedTime, onUpdateText]);
-
+  // 去掉自动保存逻辑，仅在确认时保存
   const handleTextChange = (e) => {
     const newText = e.target.value;
     setCurrentText(newText);
@@ -61,11 +44,6 @@ export default function TaskItem({
     if (textInputRef.current) {
       textInputRef.current.style.height = 'auto';
       textInputRef.current.style.height = textInputRef.current.scrollHeight + 'px';
-    }
-
-    // 防抖自动保存（仅在编辑模式下）
-    if (isEditing && newText.trim() !== task.text) {
-      debouncedSaveText(newText, currentEstimatedTime);
     }
   };
 
@@ -101,10 +79,7 @@ export default function TaskItem({
     const newTime = e.target.value;
     setCurrentEstimatedTime(newTime);
 
-    // 防抖自动保存（仅在编辑模式下）
-    if (isEditing && newTime !== (task.estimatedTime || '')) {
-      debouncedSaveText(currentText, newTime);
-    }
+    // 去掉自动保存逻辑，仅在确认时保存
   };
 
   // Enter 提交（Shift+Enter 换行），Esc 取消
@@ -131,12 +106,18 @@ export default function TaskItem({
     }
   }, [isEditing]);
 
-  // 更新本地状态
+  // 同步任务最新文本及预计时间。
+  // 仅在未处于编辑模式时，才根据内容决定是否折叠编辑选项，
+  // 避免正在编辑时因自动保存导致折叠按钮/时间输入。
   useEffect(() => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
-    setShowEditOptions(task.text.trim() === ''); // 同步显示状态：空白任务保持展开
-  }, [task.text, task.estimatedTime]);
+
+    // 若当前并非编辑状态，再根据 text 是否为空来决定 showEditOptions
+    if (!isEditing) {
+      setShowEditOptions(task.text.trim() === ''); // 空白任务保持展开
+    }
+  }, [task.text, task.estimatedTime, isEditing]);
 
   // 处理复选框点击
   const handleCheckboxClick = async (e) => {
