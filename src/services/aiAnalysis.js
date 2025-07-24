@@ -9,7 +9,7 @@ const API_BASE_URL = 'https://api.siliconflow.cn/v1';
 /**
  * 调用SiliconFlow聊天完成API
  */
-export async function callSiliconFlowAPI(messages, model = 'gpt-3.5-turbo') {
+export async function callSiliconFlowAPI(messages, model = 'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B') {
   try {
     const response = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -21,7 +21,7 @@ export async function callSiliconFlowAPI(messages, model = 'gpt-3.5-turbo') {
         model: model,
         messages: messages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 8000,
       }),
     });
 
@@ -101,7 +101,7 @@ ${JSON.stringify(taskData, null, 2)}
     const messages = [
       {
         role: 'system',
-        content: '你是一个专业的效率管理顾问，擅长分析用户的任务管理习惯并提供有针对性的改进建议。'
+        content: '你是一个专业的效率管理顾问，擅长使用重要，紧急，重要不紧急，不紧急，重要不重要、不紧急，这四个象限进行任务管理并提升效率。 你将分析用户的任务完成情况，并提供实用的建议和洞察。',
       },
       {
         role: 'user',
