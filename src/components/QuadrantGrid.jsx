@@ -166,9 +166,6 @@ export default function QuadrantGrid() {
     }
   };
 
-  // 检查是否为空数据状态
-  const isEmpty = !loading && Object.values(tasks).every(arr => arr.length === 0);
-
   const retryLoadTasks = () => {
     const { loadTasks, currentListId } = useTaskStore.getState();
     loadTasks(currentListId, true);
@@ -183,8 +180,8 @@ export default function QuadrantGrid() {
         <LoadingWrapper
           loading={loading}
           error={error}
-          empty={isEmpty}
-          emptyMessage="还没有任务，点击空白区域添加第一个任务吧！"
+          /* 当没有任务时仍然渲染象限，通过 Quadrant 自身的提示来指引用户 */
+          empty={false}
           errorMessage="加载任务失败"
           loadingType="skeleton-quadrant"
           loadingMessage="正在加载任务数据..."
