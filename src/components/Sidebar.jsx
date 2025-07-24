@@ -152,9 +152,9 @@ export default function Sidebar() {
     <>
       {/* 侧边栏 */}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        <button className="sidebar-close" onClick={closeSidebar}>
+        {/* <button className="sidebar-close" onClick={closeSidebar}>
           ✕
-        </button>
+        </button> */}
         
         {/* 任务列表标题和添加按钮 */}
         <div className="flex items-center justify-between mb-4">
