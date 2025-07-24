@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, LogOut } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { User, LogOut, Menu, Clock, BarChart3, Palette } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/stores/authStore";
 import PomodoroTimer from "./PomodoroTimer";
@@ -15,6 +15,11 @@ export default function Header({ currentTaskName = "今日待办" }) {
   const [showPomodoro, setShowPomodoro] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  
+  const menuDropdownRef = useRef(null);
+  const userDropdownRef = useRef(null);
 
   // 初始化认证状态
   useEffect(() => {
@@ -37,7 +42,42 @@ export default function Header({ currentTaskName = "今日待办" }) {
       // 未登录则显示登录弹窗
       setShowAuthModal(true);
     }
+    setShowUserDropdown(false);
   };
+
+  const handleMenuAction = (action) => {
+    switch (action) {
+      case 'pomodoro':
+        setShowPomodoro(true);
+        break;
+      case 'summary':
+        setShowSummary(true);
+        break;
+      case 'theme':
+        const currentIndex = themes.indexOf(theme);
+        const nextIndex = (currentIndex + 1) % themes.length;
+        setTheme(themes[nextIndex]);
+        break;
+    }
+    setShowMenuDropdown(false);
+  };
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuDropdownRef.current && !menuDropdownRef.current.contains(event.target)) {
+        setShowMenuDropdown(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const togglePomodoro = () => {
     setShowPomodoro(!showPomodoro);
@@ -77,62 +117,97 @@ export default function Header({ currentTaskName = "今日待办" }) {
           </span>
         </div>
 
-        {/* 右侧图标组 */}
+        {/* 右侧按钮组 */}
         <div className="flex items-center space-x-4">
-          <button
-            onClick={togglePomodoro}
-            title="番茄钟"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[20px] shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))",
-            }}
-          >
-            🍅
-          </button>
-
-          <button
-            onClick={handleThemeChange}
-            title="切换主题"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[20px] shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
-            style={{ background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))" }}
-          >
-            🎨
-          </button>
-          <button
-            onClick={toggleSummary}
-            title="任务总结"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[20px] shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
-            style={{ background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))" }}
-          >
-            📊
-          </button>
-
-          {/* 用户认证按钮 */}
-          <div className="flex items-center">
-            {user && (
-              <span className="hidden md:block text-sm text-[var(--ink-brown)] mr-3 font-['Noto_Serif_SC']">
-                {user.email}
-              </span>
-            )}
+          {/* 菜单下拉 */}
+          <div className="relative" ref={menuDropdownRef}>
             <button
-              onClick={handleAuthAction}
-              title={isAuthenticated() ? "退出登录" : "邮箱登录"}
+              onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+              title="菜单"
               className="flex h-9 w-9 items-center justify-center rounded-full shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
               style={{
-                background:
-                  "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))",
+                background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))",
               }}
             >
-              {isAuthenticated() ? (
-                <LogOut size={16} className="text-white" />
-              ) : (
-                <User size={16} className="text-white" />
-              )}
+              <Menu size={16} className="text-white" />
             </button>
+            
+            {/* 菜单下拉内容 */}
+            {showMenuDropdown && (
+              <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-[var(--accent-gold)]/20 z-50">
+                <div className="py-2">
+                  <button
+                    onClick={() => handleMenuAction('pomodoro')}
+                    className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                  >
+                    <Clock size={16} />
+                    <span className="font-['Noto_Serif_SC']">番茄钟</span>
+                  </button>
+                  <button
+                    onClick={() => handleMenuAction('summary')}
+                    className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                  >
+                    <BarChart3 size={16} />
+                    <span className="font-['Noto_Serif_SC']">任务总结</span>
+                  </button>
+                  <button
+                    onClick={() => handleMenuAction('theme')}
+                    className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                  >
+                    <Palette size={16} />
+                    <span className="font-['Noto_Serif_SC']">主题切换</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-
+          {/* 用户下拉 */}
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              title={isAuthenticated() ? "用户菜单" : "邮箱登录"}
+              className="flex h-9 w-9 items-center justify-center rounded-full shadow-[0_2px_8px_var(--shadow-soft)] transition-transform duration-300 ease-in-out hover:scale-[1.15] hover:rotate-6 hover:shadow-[0_4px_12px_var(--shadow-soft)]"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-gold), var(--ink-brown))",
+              }}
+            >
+              <User size={16} className="text-white" />
+            </button>
+            
+            {/* 用户下拉内容 */}
+            {showUserDropdown && (
+              <div className="absolute right-0 top-12 w-64 bg-white rounded-lg shadow-lg border border-[var(--accent-gold)]/20 z-50">
+                <div className="py-2">
+                  {isAuthenticated() ? (
+                    <>
+                      <div className="px-4 py-3 border-b border-[var(--accent-gold)]/10">
+                        <div className="text-sm text-[var(--ink-brown)]/60 font-['Noto_Serif_SC']">账户信息</div>
+                        <div className="text-[var(--ink-brown)] font-medium font-['Noto_Serif_SC'] mt-1">
+                          {user?.email}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleAuthAction}
+                        className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                      >
+                        <LogOut size={16} />
+                        <span className="font-['Noto_Serif_SC']">退出登录</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleAuthAction}
+                      className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                    >
+                      <User size={16} />
+                      <span className="font-['Noto_Serif_SC']">邮箱登录</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
