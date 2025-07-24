@@ -8,11 +8,30 @@ import LoadingState from '@/components/LoadingState';
 import { useTrashStore } from '@/stores/trashStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useTaskListStore } from '@/stores/taskListStore';
+import { toast } from '@/utils/toast';
 
 export default function Home() {
   const { activeList, loading: listsLoading } = useTaskListStore();
   const initializeTrashStore = useTrashStore((state) => state.initializeTrashStore);
   const initializeTaskListStore = useTaskListStore((state) => state.initialize);
+
+  // 检查登录成功参数
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const loginStatus = urlParams.get('login');
+    console.log(loginStatus,'loginStatus');
+    
+    if (loginStatus === 'success') {
+
+      // 显示登录成功提示
+      toast.success('登录成功');
+      
+      // 清除URL参数
+      urlParams.delete('login');
+      const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   // 初始化Zustand stores
   useEffect(() => {

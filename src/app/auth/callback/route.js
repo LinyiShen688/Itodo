@@ -13,13 +13,20 @@ export async function GET(request) {
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host'); // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === 'development';
+      
+      // 添加登录成功标记到重定向URL
+      const redirectUrl = new URL(next, origin);
+      redirectUrl.searchParams.set('login', 'success');
+      
       if (isLocalEnv) {
         // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-        return NextResponse.redirect(`${origin}${next}`);
+        return NextResponse.redirect(redirectUrl.toString());
       } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+        redirectUrl.host = forwardedHost;
+        redirectUrl.protocol = 'https:';
+        return NextResponse.redirect(redirectUrl.toString());
       } else {
-        return NextResponse.redirect(`${origin}${next}`);
+        return NextResponse.redirect(redirectUrl.toString());
       }
     }
   }

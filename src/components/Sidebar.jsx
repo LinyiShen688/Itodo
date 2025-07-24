@@ -158,7 +158,7 @@ export default function Sidebar() {
         
         {/* 任务列表标题和添加按钮 */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="mb-[0px] text-lg  font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC']">任务列表</h2>
+          <h2 className="!mb-0 text-lg font-medium text-[var(--ink-brown)] font-['Noto_Serif_SC']">任务列表</h2>
           <button 
             className="
               flex items-center justify-center w-8 h-8

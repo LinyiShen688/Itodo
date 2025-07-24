@@ -54,7 +54,10 @@ export const useAuthStore = create((set, get) => ({
           // 根据事件类型显示相应提示
           switch (event) {
             case 'SIGNED_IN':
-              toast.success('登录成功');
+              // 不显示登录成功提示，因为:
+              // 1. 发送邮件时已经有提示
+              // 2. Header会显示登录状态
+              // 3. 避免页面刷新时的重复提示
               break;
             case 'SIGNED_OUT':
               toast.info('已退出登录');
