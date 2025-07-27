@@ -216,7 +216,36 @@ class StorageManager {
 
 ## 3. 核心模块设计
 
-### 3.1 存储管理器 (StorageManager)
+### 3.1 ID 生成器 (UUID v4)
+
+#### 文件位置
+`src/lib/indexeddb.js` 中的 `generateId` 函数
+
+#### 设计原理
+- **使用 UUID v4**：本地和云端使用完全相同的 ID
+- **标准格式**：`550e8400-e29b-41d4-a716-446655440000`（36字符）
+- **零转换成本**：无需任何ID映射或转换
+- **极高唯一性**：碰撞概率接近零
+
+#### 实现代码
+```javascript
+// 生成唯一ID (使用UUID v4)
+export function generateId() {
+  // 使用浏览器原生 crypto API 生成 UUID v4
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // 降级方案（旧浏览器）
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+```
+
+### 3.2 存储管理器 (StorageManager)
 
 #### 文件位置
 `src/lib/storage-manager.js`
@@ -372,7 +401,7 @@ class StorageManager {
 }
 ```
 
-### 3.2 Supabase 数据层
+### 3.3 Supabase 数据层
 
 #### 文件位置
 `src/lib/supabase-db.js`
@@ -408,14 +437,11 @@ export async function batchInsertTasks(tasks, userId)
 export async function batchInsertTaskLists(taskLists, userId)
 
 // 用户数据管理
-export async function initializeUserData(userId) // 新用户初始化
 export async function getUserDataExists(userId)  // 检查用户数据是否存在
 
-// 工具函数 (处理用户ID转换)
+// 工具函数
 export function convertIndexedDBToSupabase(data, userId)
 export function convertSupabaseToIndexedDB(data)
-export function generateUserSpecificId(localId, userId)
-export function extractLocalId(supabaseId, userId)
 
 // 应用层数据一致性验证实现
 export async function validateTaskListOwnership(listId, userId) {
@@ -473,7 +499,7 @@ export async function addSupabaseTaskWithValidation(taskData) {
 }
 ```
 
-### 3.3 时区统一处理
+### 3.4 时区统一处理
 
 #### 时区问题的重要性
 在多设备、多时区的环境下，时间戳不统一会导致 LWW (Last-Write-Wins) 冲突解决错误：
@@ -528,7 +554,7 @@ function updateTaskWithTimestamp(taskData) {
 }
 ```
 
-### 3.4 同步机制设计
+### 3.5 同步机制设计
 
 #### 同步时机
 1. **用户登录时**: 自动同步本地数据到云端
@@ -579,6 +605,53 @@ async function syncData() {
   // 6. 更新同步状态
   updateSyncStatus(SYNC_STATUS.IDLE);
 }
+```
+
+#### UUID 同步实现
+使用 UUID 后，同步逻辑大大简化：
+
+```javascript
+class SyncManager {
+  async syncLocalToRemote() {
+    const unsyncedTasks = await getUnsyncedTasks();
+    
+    for (const task of unsyncedTasks) {
+      // 直接 upsert，使用相同的 UUID
+      await supabase.from('tasks').upsert({
+        id: task.id,              // 相同的 UUID，无需转换！
+        user_id: this.userId,
+        ...task
+      });
+    }
+  }
+  
+  async syncRemoteToLocal() {
+    const { data: remoteTasks } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', this.userId)
+      .gt('updated_at', this.lastSyncTime);
+    
+    for (const remoteTask of remoteTasks) {
+      // ID 完全一致，直接更新
+      await updateLocalTask(remoteTask.id, remoteTask);
+    }
+  }
+}
+
+// 本地创建任务示例
+const newTask = {
+  id: generateId(), // "550e8400-e29b-41d4-a716-446655440000"
+  text: "新任务",
+  // ... 其他字段
+};
+
+// 同步到云端时，直接使用相同的ID
+await supabase.from('tasks').insert({
+  id: newTask.id,   // 相同的 UUID，无需转换！
+  user_id: userId,
+  ...convertToSupabaseFormat(newTask)
+});
 ```
 
 ## 4. Hook 层改造
@@ -658,10 +731,9 @@ async function migrateLocalDataToRemote(userId) {
     const localTasks = await getAllTasks();
 
     if (localTaskLists.length === 0 && localTasks.length === 0) {
-      // 本地无数据，初始化默认数据
-      await initializeUserData(userId);
+      // 本地无数据，直接标记迁移完成
       localStorage.setItem(migrationKey, 'true');
-      return { success: true, message: '初始化默认数据完成' };
+      return { success: true, message: '本地无数据，无需迁移' };
     }
 
     // 4. 转换数据格式，添加用户ID
@@ -868,7 +940,7 @@ BATCH_SIZE=50
 
 ### 12.1 数据隔离策略
 - **Supabase RLS**: 使用行级安全策略确保用户只能访问自己的数据
-- **ID命名空间**: 本地ID转换为 `${userId}_${localId}` 格式
+- **UUID 统一ID**: 本地和云端使用相同的 UUID，无需转换
 - **认证验证**: 所有操作都验证用户认证状态
 - **数据迁移**: 本地数据迁移到云端时自动添加用户ID
 
@@ -891,8 +963,8 @@ class StorageManager {
     const localResult = await addTaskToIndexedDB(taskData);
     const remoteResult = await addSupabaseTask({
       ...taskData,
-      user_id: userId,
-      id: this._generateUserSpecificId(taskData.id, userId)
+      user_id: userId
+      // ID 保持不变，因为使用 UUID
     });
     
     return localResult;
@@ -915,18 +987,14 @@ export async function getSupabaseTasks(listId) {
 }
 ```
 
-### 12.3 ID转换机制
+### 12.3 UUID 统一机制
 ```javascript
-// 确保不同用户的本地ID不会冲突
-function generateUserSpecificId(localId, userId) {
-  return `${userId}_${localId}`;
-}
+// 使用 UUID 后，本地和云端使用完全相同的 ID
+// 无需任何转换，大大简化了同步逻辑
 
-function extractLocalId(supabaseId, userId) {
-  const prefix = `${userId}_`;
-  return supabaseId.startsWith(prefix) 
-    ? supabaseId.slice(prefix.length)
-    : supabaseId;
+// ID 生成使用浏览器原生 API
+function generateId() {
+  return crypto.randomUUID();
 }
 ```
 

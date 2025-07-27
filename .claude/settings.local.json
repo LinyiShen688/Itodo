@@ -15,7 +15,13 @@
       "WebFetch(domain:docs.siliconflow.cn)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm search:*)",
+      "Bash(echo $APPDATA)",
+      "Bash(npm bin:*)",
+      "Bash(npm root:*)",
+      "Bash(where context7-mcp)",
+      "Bash(where mcp-server-browsermcp)"
     ],
     "deny": []
   }

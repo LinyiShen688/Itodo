@@ -79,110 +79,22 @@ export async function initDB() {
     },
   });
 
-  // 初始化默认任务列表
-  await initDefaultTaskLists(db);
-
   return db;
 }
 
-// 初始化默认任务列表
-async function initDefaultTaskLists(db) {
-  const existingLists = await db.getAll(STORES.TASK_LISTS);
-
-  if (existingLists.length === 0) {
-    const defaultLists = [
-      {
-        id: "today",
-        name: "今天要做的事",
-        isActive: 1, // true
-        layoutMode: "FOUR",
-        showETA: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "Roadmap",
-        name: "长期规划",
-        isActive: 0, // false
-        layoutMode: "SINGLE",
-        showETA: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ];
-
-    for (const list of defaultLists) {
-      await db.add(STORES.TASK_LISTS, list);
-    }
-
-    // 添加一些示例任务
-    const defaultTasks = [
-      {
-        id: generateId(),
-        text: "打豆豆",
-        completed: 0, // false
-        quadrant: 1,
-        listId: "today",
-        estimatedTime: "2小时",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        order: 0,
-      },
-      {
-        id: generateId(),
-        text: "回复重要邮件",
-        completed: 1, // false
-        quadrant: 1,
-        listId: "today",
-        estimatedTime: "30分钟",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        order: 1,
-      },
-      {
-        id: generateId(),
-        text: "健身",
-        completed: 0, // false
-        quadrant: 2,
-        listId: "today",
-        estimatedTime: "30分钟",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        order: 0,
-      },
-      {
-        id: generateId(),
-        text: "学习游泳",
-        completed: 0, // false
-        quadrant: 1,
-        listId: "Roadmap",
-        estimatedTime: "24小时",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        order: 0,
-      },
-      {
-        id: generateId(),
-        text: "制定月度计划",
-        completed: 1, // false
-        quadrant: 1,
-        listId: "Roadmap",
-        estimatedTime: "45分钟",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        order: 1,
-      },
-    ];
-
-    for (const task of defaultTasks) {
-      await db.add(STORES.TASKS, task);
-    }
-  }
-}
-
-// 生成唯一ID
+// 生成唯一ID (使用UUID v4)
 export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  // 使用浏览器原生 crypto API 生成 UUID v4
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // 降级方案（旧浏览器）
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 // === 任务操作 ===

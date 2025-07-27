@@ -10,12 +10,12 @@
 ### Tasks 表结构 (IndexedDB)
 ```javascript
 {
-  id: string,              // 主键，生成的唯一ID (如: "lm2n3o4p5q")
+  id: string,              // 主键，使用 UUID v4 (如: "550e8400-e29b-41d4-a716-446655440000")
   text: string,            // 任务内容 (如: "完成项目提案")
   completed: 0|1,          // 完成状态 (0=未完成, 1=完成)
   deleted: 0|1,            // 删除状态 (0=未删除, 1=已删除，用于软删除)
   quadrant: 1|2|3|4,       // 象限分类 (1=重要且紧急, 2=重要不紧急, 3=紧急不重要, 4=不重要不紧急)
-  listId: string,          // 关联任务列表ID (外键，如: "today", "work")
+  listId: string,          // 关联任务列表ID (也是 UUID)
   estimatedTime: string,   // 预计完成时间 (如: "2小时", "30分钟")
   order: number,           // 同象限内排序号 (0, 1, 2...)
   createdAt: Date,         // 创建时间
@@ -26,7 +26,7 @@
 ### TaskLists 表结构 (IndexedDB)
 ```javascript
 {
-  id: string,              // 主键，列表标识符 (如: "today", "work", "AI")
+  id: string,              // 主键，使用 UUID v4 (如: "660e8400-e29b-41d4-a716-446655440001")
   name: string,            // 列表显示名称 (如: "今天要做的事", "工作的事")
   isActive: 0|1,           // 是否为当前激活列表 (0=否, 1=是，同时只能有一个为1)
   layoutMode: string,      // 布局模式 (目前固定为 "FOUR")
@@ -53,10 +53,23 @@
 
 ## 2. Supabase 数据库设计
 
+### ID 统一设计
+- **使用 UUID v4**：本地和云端使用相同的 UUID 生成策略
+- **无需ID转换**：直接使用本地生成的 UUID 作为主键
+- **避免冲突**：UUID 的极高唯一性保证多设备安全
+
+### UUID v4 特点
+- **标准格式**: `550e8400-e29b-41d4-a716-446655440000`
+- **长度**: 36字符（含连字符）
+- **唯一性**: 极高，碰撞概率接近零
+- **标准化**: 被所有主流数据库原生支持
+- **性能影响**: 虽比短ID占用更多空间，但在现代应用中影响可忽略
+
 ### 表结构转换对照
 
 | IndexedDB | Supabase | 说明 |
 |-----------|----------|------|
+| id: string (UUID) | id: UUID | **PostgreSQL原生UUID类型**，无需前缀 |
 | - | user_id: UUID | **新增字段**，关联用户ID (来自auth.users) |
 | completed: 0\|1 | completed: BOOLEAN | 数据类型转换 |
 | deleted: 0\|1 | deleted: BOOLEAN | 数据类型转换 |
@@ -72,10 +85,18 @@
 
 ```sql
 -- =============================================
+-- 启用 UUID 扩展（如果尚未启用）
+-- =============================================
+-- 注意：Supabase 通常已经启用了这个扩展
+-- UUID 类型在 PostgreSQL 中是原生支持的，占用16字节
+-- 比存储为 TEXT (36字节) 更高效
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =============================================
 -- 创建任务列表表 (task_lists)
 -- =============================================
 CREATE TABLE task_lists (
-  id TEXT PRIMARY KEY,                                    -- 列表ID，与IndexedDB保持一致  
+  id UUID PRIMARY KEY,                                    -- 使用 UUID 类型（前端生成）  
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID，关联认证用户
   name TEXT NOT NULL,                                     -- 列表名称
   is_active BOOLEAN DEFAULT FALSE,                        -- 是否为当前激活列表
@@ -93,13 +114,13 @@ CREATE UNIQUE INDEX uniq_active_list ON task_lists(user_id) WHERE is_active;
 -- 创建任务表 (tasks)
 -- =============================================
 CREATE TABLE tasks (
-  id TEXT PRIMARY KEY,                                    -- 任务ID，与IndexedDB保持一致
+  id UUID PRIMARY KEY,                                    -- 使用 UUID 类型（前端生成）
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID，关联认证用户
   text TEXT NOT NULL DEFAULT '',                          -- 任务内容
   completed BOOLEAN DEFAULT FALSE,                        -- 完成状态
   deleted BOOLEAN DEFAULT FALSE,                          -- 删除状态（软删除）
   quadrant INTEGER CHECK (quadrant >= 1 AND quadrant <= 4), -- 象限限制在1-4之间
-  list_id TEXT REFERENCES task_lists(id) ON DELETE CASCADE, -- 外键，关联任务列表
+  list_id UUID REFERENCES task_lists(id) ON DELETE CASCADE, -- 外键，关联任务列表
   estimated_time TEXT DEFAULT '',                         -- 预计完成时间
   "order" INTEGER DEFAULT 0,                             -- 排序号，order是SQL关键字需要加引号
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),     -- 创建时间，带时区
@@ -225,54 +246,10 @@ CREATE TRIGGER update_tasks_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
--- 创建用户初始化函数 (当用户首次登录时调用)
+-- 注意：由于采用空态页设计，不再需要初始化函数
 -- =============================================
-CREATE OR REPLACE FUNCTION initialize_user_data(user_uuid UUID)
-RETURNS void AS $$
-BEGIN
-  -- 安全检查：确保只有认证用户能为自己初始化数据
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Access denied: User must be authenticated';
-  END IF;
-  
-  IF auth.uid() != user_uuid THEN
-    RAISE EXCEPTION 'Access denied: Users can only initialize their own data';
-  END IF;
-
-  -- 检查是否已经初始化过，避免重复初始化
-  IF EXISTS (SELECT 1 FROM task_lists WHERE user_id = user_uuid LIMIT 1) THEN
-    RAISE NOTICE 'User data already initialized for user %', user_uuid;
-    RETURN;
-  END IF;
-
-  -- 为新用户创建默认任务列表（与 indexeddb.js 保持一致）
-  INSERT INTO task_lists (id, user_id, name, is_active, layout_mode, show_eta) VALUES
-  (user_uuid || '_today', user_uuid, '今天要做的事', true, 'FOUR', true),
-  (user_uuid || '_Roadmap', user_uuid, '长期规划', false, 'SINGLE', true);
-
-  -- 为新用户创建示例任务（与 indexeddb.js 保持一致）
-  INSERT INTO tasks (id, user_id, text, completed, deleted, quadrant, list_id, estimated_time, "order") VALUES
-  -- 今天要做的事
-  (user_uuid || '_task_001', user_uuid, '打豆豆', false, false, 1, user_uuid || '_today', '2小时', 0),
-  (user_uuid || '_task_002', user_uuid, '回复重要邮件', true, false, 1, user_uuid || '_today', '30分钟', 1),
-  (user_uuid || '_task_003', user_uuid, '健身', false, false, 2, user_uuid || '_today', '30分钟', 0),
-
-  -- 长期规划
-  (user_uuid || '_task_004', user_uuid, '学习游泳', false, false, 1, user_uuid || '_Roadmap', '24小时', 0),
-  (user_uuid || '_task_005', user_uuid, '制定月度计划', true, false, 1, user_uuid || '_Roadmap', '45分钟', 1);
-  
-  RAISE NOTICE 'Successfully initialized data for user %', user_uuid;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- =============================================
--- 设置函数执行权限 (重要安全措施)
--- =============================================
--- 撤销公共访问权限
-REVOKE EXECUTE ON FUNCTION initialize_user_data FROM PUBLIC;
-
--- 只允许认证用户执行
-GRANT EXECUTE ON FUNCTION initialize_user_data TO authenticated;
+-- 用户首次登录时不会创建任何默认数据
+-- 所有任务列表和任务由用户主动创建
 
 -- =============================================
 -- 常用查询示例 (包含用户过滤)
@@ -319,23 +296,24 @@ GRANT EXECUTE ON FUNCTION initialize_user_data TO authenticated;
 ## 4. 数据迁移注意事项
 
 ### 数据类型转换
-1. **Boolean 转换**: IndexedDB 的 0/1 需要转换为 Supabase 的 true/false
-2. **时间戳格式**: IndexedDB 的 Date 对象需要转换为 ISO 字符串
-3. **字段名转换**: 驼峰命名转为下划线格式
-4. **时区统一**: 所有时间戳必须统一为 UTC，避免 LWW 冲突解决错误
+1. **ID 保持不变**: 使用 UUID 后，本地和云端使用相同的 ID
+2. **Boolean 转换**: IndexedDB 的 0/1 需要转换为 Supabase 的 true/false
+3. **时间戳格式**: IndexedDB 的 Date 对象需要转换为 ISO 字符串
+4. **字段名转换**: 驼峰命名转为下划线格式
+5. **时区统一**: 所有时间戳必须统一为 UTC，避免 LWW 冲突解决错误
 
 ### 迁移脚本示例
 ```javascript
-// IndexedDB 数据转换为 Supabase 格式 (需要当前用户ID + 时区统一)
+// IndexedDB 数据转换为 Supabase 格式
 function convertTaskForSupabase(indexedDBTask, userId) {
   return {
-    id: `${userId}_${indexedDBTask.id}`, // 确保ID全局唯一
-    user_id: userId,                      // 添加用户ID
+    id: indexedDBTask.id,                  // 直接使用 UUID，无需转换
+    user_id: userId,                       // 添加用户ID
     text: indexedDBTask.text,
     completed: indexedDBTask.completed === 1,
     deleted: indexedDBTask.deleted === 1,
     quadrant: indexedDBTask.quadrant,
-    list_id: `${userId}_${indexedDBTask.listId}`, // 更新列表ID引用
+    list_id: indexedDBTask.listId,         // 直接使用 UUID
     estimated_time: indexedDBTask.estimatedTime,
     order: indexedDBTask.order,
     // 关键：确保时间戳转换为UTC ISO字符串，避免时区问题
@@ -346,8 +324,8 @@ function convertTaskForSupabase(indexedDBTask, userId) {
 
 function convertTaskListForSupabase(indexedDBTaskList, userId) {
   return {
-    id: `${userId}_${indexedDBTaskList.id}`, // 确保ID全局唯一
-    user_id: userId,                          // 添加用户ID
+    id: indexedDBTaskList.id,              // 直接使用 UUID，无需转换
+    user_id: userId,                       // 添加用户ID
     name: indexedDBTaskList.name,
     is_active: indexedDBTaskList.isActive === 1,
     layout_mode: indexedDBTaskList.layoutMode,
@@ -404,7 +382,20 @@ async function migrateUserDataToSupabase(userId) {
 - **部分索引**: 只为已删除任务创建索引，节省空间
 - **写性能优先**: 减少索引维护开销，提升写入性能
 
-### 5.2 索引性能监控
+### 5.2 UUID 性能考虑
+
+| 方面 | 影响 | 缓解措施 |
+|------|------|----------|
+| 存储空间 | UUID 占用 36 字符 vs 短ID 10字符 | 现代设备存储充足，影响可忽略 |
+| 索引性能 | UUID 无序，可能影响B树索引 | 使用时间戳作为辅助排序字段 |
+| 网络传输 | 比短ID多传输约 26 字节/记录 | gzip 压缩可减少50%+传输量 |
+
+**优化建议**:
+1. **使用时间戳排序**：不依赖 UUID 排序，使用 created_at/updated_at
+2. **批量操作**：减少网络往返次数
+3. **启用压缩**：HTTP gzip 压缩可大幅减少 UUID 的传输开销
+
+### 5.3 索引性能监控
 ```sql
 -- 监控慢查询（定期检查）
 SELECT 
@@ -438,7 +429,7 @@ WHERE idx_scan = 0
   AND tablename IN ('tasks', 'task_lists');
 ```
 
-### 5.3 数据量扩展策略
+### 5.4 数据量扩展策略
 当单用户任务数超过 5000 时，考虑添加以下索引：
 ```sql
 -- 大数据量时的补充索引
@@ -446,7 +437,7 @@ CREATE INDEX idx_tasks_user_completed ON tasks(user_id, completed);
 CREATE INDEX idx_tasks_created_at ON tasks(created_at);
 ```
 
-### 5.4 其他优化建议
+### 5.5 其他优化建议
 - **批量操作**: 使用事务进行批量插入/更新
 - **缓存策略**: 客户端实现适当的缓存机制
 - **连接池**: 合理配置数据库连接池大小
