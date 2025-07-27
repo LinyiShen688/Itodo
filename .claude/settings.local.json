@@ -21,7 +21,13 @@
       "Bash(npm bin:*)",
       "Bash(npm root:*)",
       "Bash(where context7-mcp)",
-      "Bash(where mcp-server-browsermcp)"
+      "Bash(where mcp-server-browsermcp)",
+      "Bash(context7-mcp:*)",
+      "Bash(mcp-server-browsermcp:*)",
+      "Bash(powershell:*)",
+      "Bash(pwsh:*)",
+      "Bash(del D:3.AI-projectitodo3claudeDSP.ps1)",
+      "Bash(claude mcp:*)"
     ],
     "deny": []
   }
