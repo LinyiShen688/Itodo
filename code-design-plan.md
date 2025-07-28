@@ -106,33 +106,6 @@ async function addTask(taskData) {
 }
 ```
 
-#### 云端持久化 (Incremental Sync)
-```javascript
-// 增量同步机制
-export async function performIncrementalSync() {
-  // 1. 获取本地最后同步时间戳
-  const lastSyncTime = await getLastSyncTimestamp();
-  
-  // 2. 查找本地变更数据 (自上次同步后)
-  const localChanges = await getLocalChanges(lastSyncTime);
-  
-  // 3. 推送本地变更到云端
-  for (const change of localChanges) {
-    await pushChangeToSupabase(change);
-  }
-  
-  // 4. 拉取云端变更 (自上次同步后)
-  const remoteChanges = await pullRemoteChanges(lastSyncTime);
-  
-  // 5. 应用云端变更到本地
-  for (const change of remoteChanges) {
-    await applyRemoteChangeLocally(change);
-  }
-  
-  // 6. 更新同步时间戳
-  await updateLastSyncTimestamp(Date.now());
-}
-```
 
 #### 冲突最小化 (Auto-Merge) - 时区安全的 LWW
 ```javascript
