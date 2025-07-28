@@ -4,8 +4,8 @@
 
 ### 数据库信息
 - **数据库名**: iTodoApp
-- **版本**: 3
-- **存储空间**: tasks, taskLists
+- **版本**: 5 (从版本4升级，新增同步队列)
+- **存储空间**: tasks, taskLists, syncQueue
 
 ### Tasks 表结构 (IndexedDB)
 ```javascript
@@ -13,7 +13,7 @@
   id: string,              // 主键，使用 UUID v4 (如: "550e8400-e29b-41d4-a716-446655440000")
   text: string,            // 任务内容 (如: "完成项目提案")
   completed: 0|1,          // 完成状态 (0=未完成, 1=完成)
-  deleted: 0|1,            // 删除状态 (0=未删除, 1=已删除，用于软删除)
+  deleted: 0|1|2,          // 删除状态 (0=正常, 1=收纳箱, 2=永久删除/墓碑)
   quadrant: 1|2|3|4,       // 象限分类 (1=重要且紧急, 2=重要不紧急, 3=紧急不重要, 4=不重要不紧急)
   listId: string,          // 关联任务列表ID (也是 UUID)
   estimatedTime: string,   // 预计完成时间 (如: "2小时", "30分钟")
@@ -29,11 +29,30 @@
   id: string,              // 主键，使用 UUID v4 (如: "660e8400-e29b-41d4-a716-446655440001")
   name: string,            // 列表显示名称 (如: "今天要做的事", "工作的事")
   isActive: 0|1,           // 是否为当前激活列表 (0=否, 1=是，同时只能有一个为1)
+  deleted: 0|2,            // 删除状态 (0=正常, 2=墓碑，无需1收纳箱状态)
   layoutMode: string,      // 布局模式 (目前固定为 "FOUR")
   showETA: boolean,        // 是否显示预计时间 (true/false)
   createdAt: Date,         // 创建时间
   updatedAt: Date          // 更新时间
   // 注意：IndexedDB 版本没有 user_id，因为是本地存储，天然按用户隔离
+}
+```
+
+### SyncQueue 表结构 (IndexedDB) ← 新增
+```javascript
+{
+  id: string,              // 主键，使用 UUID v4 (如: "770e8400-e29b-41d4-a716-446655440002")
+  status: string,          // 同步状态 (pending|processing|completed|failed)
+  action: string,          // 操作类型 (add|update|delete)
+  entityType: string,      // 实体类型 (task|taskList)
+  entityId: string,        // 目标实体的UUID
+  changes: object,         // 变更字段（仅存储实际变更的字段，如: {text: "新内容", completed: 1}）
+  // 对于add操作，存储完整对象；对于update操作，只存储变更字段；对于delete操作，只需entityId
+  createdAt: Date,         // 创建时间
+  completedAt: Date,       // 完成时间 (null 表示未完成)
+  retryCount: number,      // 重试次数 (默认 0)
+  error: string,           // 错误信息 (null 表示无错误)
+  // 注意：同步队列不需要 updatedAt，因为状态转换是单向的
 }
 ```
 
@@ -48,7 +67,14 @@
 
 // TaskLists 表索引
 - 'isActive' (激活状态索引)
+- 'deleted' (删除状态索引)
 - 'createdAt' (创建时间索引)
+
+// SyncQueue 表索引 ← 新增
+- 'status' (同步状态索引) - 用于查询待处理/失败的项
+- 'createdAt' (创建时间索引) - 用于按时间排序
+- 'entityType' (实体类型索引) - 用于按类型过滤
+- 'action' (操作类型索引) - 用于按操作过滤
 ```
 
 ## 2. Supabase 数据库设计
@@ -72,7 +98,8 @@
 | id: string (UUID) | id: UUID | **PostgreSQL原生UUID类型**，无需前缀 |
 | - | user_id: UUID | **新增字段**，关联用户ID (来自auth.users) |
 | completed: 0\|1 | completed: BOOLEAN | 数据类型转换 |
-| deleted: 0\|1 | deleted: BOOLEAN | 数据类型转换 |
+| deleted: 0\|1\|2 | deleted: SMALLINT | 使用 SMALLINT 支持三种状态 |
+| deleted: 0\|2 (task_lists) | deleted: SMALLINT | task_lists只需0和2两种状态 |
 | isActive: 0\|1 | is_active: BOOLEAN | 字段名转换+数据类型转换 |
 | listId | list_id | 字段名转换为下划线格式 |
 | estimatedTime | estimated_time | 字段名转换为下划线格式 |
@@ -100,6 +127,7 @@ CREATE TABLE task_lists (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID，关联认证用户
   name TEXT NOT NULL,                                     -- 列表名称
   is_active BOOLEAN DEFAULT FALSE,                        -- 是否为当前激活列表
+  deleted SMALLINT DEFAULT 0 CHECK (deleted IN (0, 2)),   -- 删除状态 (0=正常, 2=墓碑)
   layout_mode TEXT DEFAULT 'FOUR',                        -- 布局模式，目前固定为FOUR
   show_eta BOOLEAN DEFAULT TRUE,                          -- 是否显示预计完成时间
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),     -- 创建时间，带时区
@@ -107,8 +135,8 @@ CREATE TABLE task_lists (
 );
 
 -- 部分唯一索引：确保每个用户同时只能有一个激活列表
--- 只对 is_active = true 的记录创建唯一约束，允许多个 is_active = false
-CREATE UNIQUE INDEX uniq_active_list ON task_lists(user_id) WHERE is_active;
+-- 只对 is_active = true 且未删除的记录创建唯一约束
+CREATE UNIQUE INDEX uniq_active_list ON task_lists(user_id) WHERE is_active = true AND deleted = 0;
 
 -- =============================================
 -- 创建任务表 (tasks)
@@ -118,16 +146,16 @@ CREATE TABLE tasks (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID，关联认证用户
   text TEXT NOT NULL DEFAULT '',                          -- 任务内容
   completed BOOLEAN DEFAULT FALSE,                        -- 完成状态
-  deleted BOOLEAN DEFAULT FALSE,                          -- 删除状态（软删除）
+  deleted SMALLINT DEFAULT 0 CHECK (deleted IN (0, 1, 2)), -- 删除状态 (0=正常, 1=收纳箱, 2=墓碑)
   quadrant INTEGER CHECK (quadrant >= 1 AND quadrant <= 4), -- 象限限制在1-4之间
-  list_id UUID REFERENCES task_lists(id) ON DELETE CASCADE, -- 外键，关联任务列表
+  list_id UUID REFERENCES task_lists(id) ON DELETE RESTRICT, -- 外键，改为RESTRICT防止级联删除
   estimated_time TEXT DEFAULT '',                         -- 预计完成时间
   "order" INTEGER DEFAULT 0,                             -- 排序号，order是SQL关键字需要加引号
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),     -- 创建时间，带时区
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()      -- 更新时间，带时区
   
-  -- 注意：移除了子查询 CHECK 约束以提升性能
-  -- 用户一致性由应用层确保：插入任务时验证 list_id 属于当前用户
+  -- 注意：ON DELETE RESTRICT 确保不会因为删除task_list而物理删除tasks
+  -- 删除task_list时需要先将其下所有tasks标记为deleted=2
 );
 
 -- =============================================
@@ -137,20 +165,39 @@ CREATE TABLE tasks (
 -- 基于实际数据量优化：单用户 ~700 任务，5-6 个列表
 -- 过多索引会影响写入性能，对小数据量查询提升有限
 
--- 任务表核心索引（必需）
-CREATE INDEX idx_tasks_user_list_quadrant ON tasks(user_id, list_id, quadrant, "order"); 
--- 这一个复合索引覆盖最常用查询：
---   - 按用户查询：user_id
---   - 按列表查询：user_id, list_id  
---   - 按象限查询：user_id, list_id, quadrant
---   - 排序查询：user_id, list_id, quadrant, order
+-- 任务表核心索引（重新设计）
+-- 1. 用户索引（最基础的查询）
+CREATE INDEX idx_tasks_user_id ON tasks(user_id);
 
--- 软删除查询索引（回收站功能必需）
-CREATE INDEX idx_tasks_user_deleted ON tasks(user_id, deleted) WHERE deleted = true;
--- 部分索引：只为已删除的任务创建索引，节省空间
+-- 2. 列表查询索引（获取某个列表的所有任务）
+CREATE INDEX idx_tasks_user_list ON tasks(user_id, list_id) 
+WHERE deleted = 0;  -- 部分索引，只索引未删除的任务
 
--- 任务列表表索引（必需）
+-- 3. 象限排序索引（四象限视图查询）
+CREATE INDEX idx_tasks_list_quadrant_order ON tasks(list_id, quadrant, "order") 
+WHERE deleted = 0;  -- 部分索引，提高查询效率
+
+-- 4. 回收站索引（软删除查询）
+CREATE INDEX idx_tasks_user_deleted ON tasks(user_id, deleted) 
+WHERE deleted = 1;  -- 只索引回收站中的任务
+
+-- 5. 同步索引（用于增量同步）
+CREATE INDEX idx_tasks_updated_at ON tasks(updated_at);
+
+-- 任务列表表索引
+-- 1. 用户查询索引
 CREATE INDEX idx_task_lists_user_id ON task_lists(user_id);
+
+-- 2. 激活列表查询索引
+CREATE INDEX idx_task_lists_user_active ON task_lists(user_id, is_active) 
+WHERE is_active = true AND deleted = 0;  -- 部分索引，快速找到未删除的激活列表
+
+-- 3. 未删除列表查询索引
+CREATE INDEX idx_task_lists_user_deleted ON task_lists(user_id, deleted)
+WHERE deleted = 0;  -- 部分索引，快速查询用户的正常列表
+
+-- 4. 同步索引（用于增量同步）
+CREATE INDEX idx_task_lists_updated_at ON task_lists(updated_at);
 
 -- =============================================
 -- 移除的索引及原因（在注释中保留，便于未来扩展）
@@ -184,12 +231,13 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 -- 任务列表表策略
 -- SELECT/DELETE: 只能访问自己的数据
-CREATE POLICY "Users can select/delete their own task lists" ON task_lists FOR SELECT USING (
+CREATE POLICY "Users can select their own task lists" ON task_lists FOR SELECT USING (
   auth.uid() = user_id
 );
 CREATE POLICY "Users can delete their own task lists" ON task_lists FOR DELETE USING (
   auth.uid() = user_id
 );
+
 
 -- INSERT: 只能插入属于自己的数据
 CREATE POLICY "Users can insert their own task lists" ON task_lists FOR INSERT WITH CHECK (
@@ -255,40 +303,46 @@ CREATE TRIGGER update_tasks_updated_at
 -- 常用查询示例 (包含用户过滤)
 -- =============================================
 
--- 查询当前用户特定列表的所有未删除任务，按象限和顺序排序
+-- 查询当前用户特定列表的所有正常任务，按象限和顺序排序
 -- SELECT * FROM tasks 
--- WHERE user_id = auth.uid() AND list_id = 'user_id_today' AND deleted = false 
+-- WHERE user_id = auth.uid() AND list_id = 'user_id_today' AND deleted = 0 
 -- ORDER BY quadrant, "order";
 
 -- 查询当前用户特定象限的任务
 -- SELECT * FROM tasks 
--- WHERE user_id = auth.uid() AND list_id = 'user_id_today' AND quadrant = 1 AND deleted = false 
+-- WHERE user_id = auth.uid() AND list_id = 'user_id_today' AND quadrant = 1 AND deleted = 0 
 -- ORDER BY "order";
 
 -- 查询当前用户的激活任务列表
 -- SELECT * FROM task_lists 
--- WHERE user_id = auth.uid() AND is_active = true 
+-- WHERE user_id = auth.uid() AND is_active = true AND deleted = 0
 -- LIMIT 1;
 
--- 查询当前用户的所有任务列表
+-- 查询当前用户的所有任务列表（不含已删除）
 -- SELECT * FROM task_lists 
--- WHERE user_id = auth.uid() 
+-- WHERE user_id = auth.uid() AND deleted = 0
 -- ORDER BY created_at;
 
--- 查询当前用户已删除的任务（回收站）
+-- 查询当前用户收纳箱的任务
 -- SELECT * FROM tasks 
--- WHERE user_id = auth.uid() AND deleted = true 
+-- WHERE user_id = auth.uid() AND deleted = 1 
 -- ORDER BY updated_at DESC;
 
--- 查询当前用户的任务统计
+-- 查询当前用户所有非墓碑任务（正常+收纳箱）
+-- SELECT * FROM tasks 
+-- WHERE user_id = auth.uid() AND deleted < 2 
+-- ORDER BY deleted, updated_at DESC;
+
+-- 查询当前用户的任务统计（只统计未删除的列表）
 -- SELECT 
 --   tl.name as list_name,
 --   COUNT(t.id) as total_tasks,
 --   COUNT(CASE WHEN t.completed = true THEN 1 END) as completed_tasks,
---   COUNT(CASE WHEN t.deleted = true THEN 1 END) as deleted_tasks
+--   COUNT(CASE WHEN t.deleted = 1 THEN 1 END) as trash_tasks,
+--   COUNT(CASE WHEN t.deleted = 2 THEN 1 END) as tombstone_tasks
 -- FROM task_lists tl
 -- LEFT JOIN tasks t ON tl.id = t.list_id AND t.user_id = tl.user_id
--- WHERE tl.user_id = auth.uid()
+-- WHERE tl.user_id = auth.uid() AND tl.deleted = 0
 -- GROUP BY tl.id, tl.name
 -- ORDER BY tl.created_at;
 ```
@@ -297,10 +351,14 @@ CREATE TRIGGER update_tasks_updated_at
 
 ### 数据类型转换
 1. **ID 保持不变**: 使用 UUID 后，本地和云端使用相同的 ID
-2. **Boolean 转换**: IndexedDB 的 0/1 需要转换为 Supabase 的 true/false
-3. **时间戳格式**: IndexedDB 的 Date 对象需要转换为 ISO 字符串
-4. **字段名转换**: 驼峰命名转为下划线格式
-5. **时区统一**: 所有时间戳必须统一为 UTC，避免 LWW 冲突解决错误
+2. **Boolean 转换**: IndexedDB 的 0/1 需要转换为 Supabase 的 true/false（除了 deleted 字段）
+3. **删除状态转换**: 
+   - tasks的deleted字段保持数值类型（0/1/2）
+   - task_lists的deleted字段保持数值类型（0/2）
+4. **时间戳格式**: IndexedDB 的 Date 对象需要转换为 ISO 字符串
+5. **字段名转换**: 驼峰命名转为下划线格式
+6. **时区统一**: 所有时间戳必须统一为 UTC，避免 LWW 冲突解决错误
+7. **同步队列不迁移**: SyncQueue 表是本地专有的，不需要迁移到云端
 
 ### 迁移脚本示例
 ```javascript
@@ -311,7 +369,7 @@ function convertTaskForSupabase(indexedDBTask, userId) {
     user_id: userId,                       // 添加用户ID
     text: indexedDBTask.text,
     completed: indexedDBTask.completed === 1,
-    deleted: indexedDBTask.deleted === 1,
+    deleted: indexedDBTask.deleted,  // 直接传递，支持 0/1/2 三种状态
     quadrant: indexedDBTask.quadrant,
     list_id: indexedDBTask.listId,         // 直接使用 UUID
     estimated_time: indexedDBTask.estimatedTime,
@@ -328,6 +386,7 @@ function convertTaskListForSupabase(indexedDBTaskList, userId) {
     user_id: userId,                       // 添加用户ID
     name: indexedDBTaskList.name,
     is_active: indexedDBTaskList.isActive === 1,
+    deleted: indexedDBTaskList.deleted || 0,  // 处理deleted字段，默认为0
     layout_mode: indexedDBTaskList.layoutMode,
     show_eta: indexedDBTaskList.showETA,
     created_at: indexedDBTaskList.createdAt.toISOString(),
@@ -338,9 +397,10 @@ function convertTaskListForSupabase(indexedDBTaskList, userId) {
 // 完整的数据迁移流程
 async function migrateUserDataToSupabase(userId) {
   try {
-    // 1. 获取本地数据
+    // 1. 获取本地数据（同步队列不需要迁移）
     const localTaskLists = await getAllTaskLists();
     const localTasks = await getAllTasks();
+    // 注意：SyncQueue 不迁移，它是本地用于同步的临时数据
 
     // 2. 转换数据格式，添加用户ID
     const supabaseTaskLists = localTaskLists.map(list => 
@@ -374,15 +434,54 @@ async function migrateUserDataToSupabase(userId) {
 }
 ```
 
-## 5. 性能优化建议
+## 5. 墓碑模式设计
 
-### 5.1 索引策略（针对小数据量优化）
+### 5.1 设计理念
+采用"墓碑模式"处理永久删除，通过状态标记而非物理删除来实现数据的完全移除：
+
+**Tasks的删除状态**：
+- **deleted = 0**: 正常状态，任务在主界面显示
+- **deleted = 1**: 收纳箱状态，任务移到收纳箱但可恢复
+- **deleted = 2**: 墓碑状态，永久删除但保留记录用于同步
+
+**TaskLists的删除状态**：
+- **deleted = 0**: 正常状态，列表正常显示
+- **deleted = 2**: 墓碑状态，列表被删除（无需收纳箱状态）
+
+### 5.2 同步策略
+```sql
+-- 永久删除操作
+-- 本地：UPDATE tasks SET deleted = 2 WHERE id = ?
+-- 本地：UPDATE task_lists SET deleted = 2 WHERE id = ?
+-- 云端：使用 UPSERT 同步墓碑数据
+
+-- 删除task_list的完整流程
+-- 1. UPDATE task_lists SET deleted = 2 WHERE id = ?
+-- 2. UPDATE tasks SET deleted = 2 WHERE list_id = ?
+-- 3. 两个操作都进入同步队列
+
+-- 同步规则
+-- 1. push: 所有行（含 deleted=2）都用 upsert 发送到云端
+-- 2. pull: 收到 deleted=2 行时，本地直接 upsert 覆盖旧行
+-- 3. 不做物理 DELETE 操作，确保同步一致性
+-- 4. 外键约束(ON DELETE RESTRICT)防止意外物理删除
+```
+
+### 5.3 优势
+1. **同步简单**: 统一使用 UPSERT，避免 DELETE 操作的复杂性
+2. **数据一致性**: 墓碑记录确保离线/在线场景的最终一致性
+3. **可追溯性**: 保留完整数据历史（如需要可定期清理）
+4. **冲突避免**: 避免了删除-创建的同步冲突
+
+## 6. 性能优化建议
+
+### 6.1 索引策略（针对小数据量优化）
 - **精简设计**: 从11个索引减少到3个核心索引
 - **复合索引**: 一个核心复合索引覆盖多种查询场景
 - **部分索引**: 只为已删除任务创建索引，节省空间
 - **写性能优先**: 减少索引维护开销，提升写入性能
 
-### 5.2 UUID 性能考虑
+### 6.2 UUID 性能考虑
 
 | 方面 | 影响 | 缓解措施 |
 |------|------|----------|
@@ -390,12 +489,20 @@ async function migrateUserDataToSupabase(userId) {
 | 索引性能 | UUID 无序，可能影响B树索引 | 使用时间戳作为辅助排序字段 |
 | 网络传输 | 比短ID多传输约 26 字节/记录 | gzip 压缩可减少50%+传输量 |
 
+**关于UUID版本选择**:
+- **当前使用UUID v4**：成熟稳定，所有平台原生支持
+- **UUID v7考虑**：虽然有时间排序优势，但：
+  - Supabase/PostgreSQL 需要额外扩展支持
+  - 前端需要引入第三方库
+  - 对于每用户几百条数据的场景，性能提升有限
+- **结论**：当前数据量下UUID v4完全够用
+
 **优化建议**:
 1. **使用时间戳排序**：不依赖 UUID 排序，使用 created_at/updated_at
 2. **批量操作**：减少网络往返次数
 3. **启用压缩**：HTTP gzip 压缩可大幅减少 UUID 的传输开销
 
-### 5.3 索引性能监控
+### 6.3 索引性能监控
 ```sql
 -- 监控慢查询（定期检查）
 SELECT 
@@ -429,7 +536,7 @@ WHERE idx_scan = 0
   AND tablename IN ('tasks', 'task_lists');
 ```
 
-### 5.4 数据量扩展策略
+### 6.4 数据量扩展策略
 当单用户任务数超过 5000 时，考虑添加以下索引：
 ```sql
 -- 大数据量时的补充索引
@@ -437,14 +544,34 @@ CREATE INDEX idx_tasks_user_completed ON tasks(user_id, completed);
 CREATE INDEX idx_tasks_created_at ON tasks(created_at);
 ```
 
-### 5.5 其他优化建议
+### 6.5 其他优化建议
 - **批量操作**: 使用事务进行批量插入/更新
 - **缓存策略**: 客户端实现适当的缓存机制
 - **连接池**: 合理配置数据库连接池大小
 - **定期清理**: 定期清理软删除的数据
 
-## 6. 安全考虑
+## 7. 同步队列表结构说明
+
+### SyncQueue 表的作用
+同步队列是本地专有的表，用于：
+- 记录待同步到云端的操作
+- 保证离线操作不丢失
+- 支持操作重试和错误处理
+- 提供同步状态追踪
+
+### 同步队列状态说明
+- **pending**: 等待同步的操作
+- **processing**: 正在同步中
+- **completed**: 同步成功
+- **failed**: 同步失败，需要手动处理
+
+注：具体的同步机制实现请参考 code-design-plan.md 文档。
+
+## 8. 安全考虑
 
 1. **RLS 策略**: 生产环境需要基于用户ID的行级安全策略
 2. **数据验证**: 客户端和服务端都需要数据格式验证
 3. **API 限制**: 设置适当的 API 调用频率限制
+4. **同步队列安全**: 同步队列不包含敏感信息，只在本地存储
+5. **级联删除防护**: 使用ON DELETE RESTRICT防止意外的数据级联删除
+6. **软删除保护**: 所有删除操作都是软删除，保证数据可恢复性

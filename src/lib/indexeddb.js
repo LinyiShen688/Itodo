@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "iTodoApp";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORES = {
   TASKS: "tasks",
@@ -30,6 +30,7 @@ export async function initDB() {
           keyPath: "id",
         });
         listStore.createIndex("isActive", "isActive");
+        listStore.createIndex("deleted", "deleted");
         listStore.createIndex("createdAt", "createdAt");
       }
 
@@ -71,6 +72,30 @@ export async function initDB() {
             if (!task.hasOwnProperty("deleted")) {
               task.deleted = 0; // 0表示未删除，1表示已删除
               cursor.update(task);
+            }
+            cursor.continue();
+          }
+        };
+      }
+
+      // 版本4升级：为任务列表添加deleted字段
+      if (oldVersion < 4 && db.objectStoreNames.contains(STORES.TASK_LISTS)) {
+        const listStore = transaction.objectStore(STORES.TASK_LISTS);
+
+        // 添加deleted索引
+        if (!listStore.indexNames.contains("deleted")) {
+          listStore.createIndex("deleted", "deleted");
+        }
+
+        // 为现有任务列表添加 deleted 字段
+        const request = listStore.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const list = cursor.value;
+            if (!list.hasOwnProperty("deleted")) {
+              list.deleted = 0; // 0表示正常，2表示墓碑
+              cursor.update(list);
             }
             cursor.continue();
           }
@@ -237,17 +262,21 @@ export async function reorderTasks(tasks) {
 
 // === 任务列表操作 ===
 
-// 获取所有任务列表
+// 获取所有任务列表（不包含已删除的）
 export async function getAllTaskLists() {
   const db = await initDB();
-  return await db.getAll(STORES.TASK_LISTS);
+  const allLists = await db.getAll(STORES.TASK_LISTS);
+  // 过滤掉已删除的列表 (deleted === 2 为墓碑状态)
+  return allLists.filter(list => list.deleted !== 2);
 }
 
 // 获取当前激活的任务列表
 export async function getActiveTaskList() {
   const db = await initDB();
   const lists = await db.getAllFromIndex(STORES.TASK_LISTS, "isActive", 1);
-  return lists[0] || null;
+  // 确保返回的激活列表不是已删除的
+  const activeList = lists.find(list => list.deleted !== 2);
+  return activeList || null;
 }
 
 // 添加新任务列表
@@ -258,6 +287,7 @@ export async function addTaskList(name, layoutMode = "FOUR", showETA = true) {
     id: generateId(),
     name: name,
     isActive: 0, // false
+    deleted: 0, // 0表示正常，2表示墓碑
     layoutMode,
     showETA,
     createdAt: new Date(),
@@ -292,6 +322,12 @@ export async function setActiveTaskList(id) {
   const db = await initDB();
   const tx = db.transaction(STORES.TASK_LISTS, "readwrite");
 
+  // 先检查要激活的列表是否存在且未被删除
+  const targetList = await tx.store.get(id);
+  if (!targetList || targetList.deleted === 2) {
+    throw new Error("Cannot activate a deleted task list");
+  }
+
   // 先取消所有列表的激活状态
   const allLists = await tx.store.getAll();
   for (const list of allLists) {
@@ -308,18 +344,36 @@ export async function setActiveTaskList(id) {
   return await db.get(STORES.TASK_LISTS, id);
 }
 
-// 删除任务列表
+// 删除任务列表（软删除）
 export async function deleteTaskList(id) {
   const db = await initDB();
   const tx = db.transaction([STORES.TASK_LISTS, STORES.TASKS], "readwrite");
 
-  // 删除列表
-  await tx.objectStore(STORES.TASK_LISTS).delete(id);
+  // 获取要删除的列表
+  const listStore = tx.objectStore(STORES.TASK_LISTS);
+  const taskList = await listStore.get(id);
+  
+  if (!taskList) {
+    throw new Error("Task list not found");
+  }
 
-  // 删除该列表下的所有任务
-  const tasks = await tx.objectStore(STORES.TASKS).index("listId").getAll(id);
+  // 标记列表为墓碑状态
+  await listStore.put({
+    ...taskList,
+    deleted: 2, // 墓碑状态
+    isActive: 0, // 取消激活状态
+    updatedAt: new Date(),
+  });
+
+  // 标记该列表下的所有任务为墓碑状态
+  const taskStore = tx.objectStore(STORES.TASKS);
+  const tasks = await taskStore.index("listId").getAll(id);
   for (const task of tasks) {
-    await tx.objectStore(STORES.TASKS).delete(task.id);
+    await taskStore.put({
+      ...task,
+      deleted: 2, // 墓碑状态
+      updatedAt: new Date(),
+    });
   }
 
   await tx.done;
