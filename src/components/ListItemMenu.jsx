@@ -91,7 +91,7 @@ export default function ListItemMenu({
 
   if (isRenaming) {
     return (
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
         <input
           ref={renameInputRef}
           type="text"
@@ -99,6 +99,8 @@ export default function ListItemMenu({
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={handleRenameKeyDown}
           onBlur={finishRenaming}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           className="w-full px-2 py-1 text-sm bg-[var(--white-trans)] border border-[var(--accent-gold)]/30 rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent-gold)]/50 focus:border-[var(--accent-gold)] text-[var(--ink-brown)] font-['Noto_Serif_SC']"
           placeholder="输入列表名称..."
         />
