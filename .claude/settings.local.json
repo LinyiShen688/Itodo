@@ -27,7 +27,11 @@
       "Bash(powershell:*)",
       "Bash(pwsh:*)",
       "Bash(del D:3.AI-projectitodo3claudeDSP.ps1)",
-      "Bash(claude mcp:*)"
+      "Bash(claude mcp:*)",
+      "Bash(echo $SHELL)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(afplay:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

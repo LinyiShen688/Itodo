@@ -1579,9 +1579,11 @@ const SyncStatusBar = () => {
 };
 ```
 
-## 4. Hook 层改造
+## 4. 其他模块设计
 
-### 4.1 useTasks Hook 改造
+### 4.1 Hook 层改造
+
+#### useTasks Hook 改造
 
 #### 主要变更
 ```javascript
@@ -1614,7 +1616,7 @@ export function useTasks(listId = 'today') {
 }
 ```
 
-### 4.2 useTaskLists Hook 改造
+#### useTaskLists Hook 改造
 
 #### 主要变更
 ```javascript
@@ -1637,14 +1639,14 @@ export function useTaskLists() {
 }
 ```
 
-## 5. 数据迁移实现
+### 4.2 数据迁移实现
 
-### 5.1 迁移触发时机
+#### 迁移触发时机
 - 用户首次登录成功后
 - 检测到本地有数据但云端为空时
 - 用户主动触发同步时
 
-### 5.2 迁移流程
+#### 迁移流程
 ```javascript
 async function migrateLocalDataToRemote(userId) {
   try {
@@ -1695,9 +1697,9 @@ async function migrateLocalDataToRemote(userId) {
 }
 ```
 
-## 6. 错误处理和容错机制
+### 4.3 错误处理和容错机制
 
-### 6.1 网络异常处理
+#### 网络异常处理
 ```javascript
 // UnifiedStorage 已经内置了网络异常处理
 // 1. 所有操作首先写入本地，确保离线可用
@@ -1716,7 +1718,7 @@ window.addEventListener('offline', () => {
 });
 ```
 
-### 6.2 数据冲突处理
+#### 数据冲突处理
 ```javascript
 function detectConflicts(localData, remoteData) {
   const conflicts = [];
@@ -1739,9 +1741,9 @@ function detectConflicts(localData, remoteData) {
 }
 ```
 
-## 7. 状态管理增强
+### 4.4 状态管理增强
 
-### 7.1 同步状态管理
+#### 同步状态管理
 ```javascript
 // 新增 syncStore
 export const useSyncStore = create((set, get) => ({
@@ -1758,7 +1760,7 @@ export const useSyncStore = create((set, get) => ({
 }));
 ```
 
-### 7.2 认证状态监听
+#### 认证状态监听
 ```javascript
 // 在 UnifiedStorage 的 Zustand store 中监听认证状态变化
 // 这段代码已经在上面的 UnifiedStorage 实现中包含了
@@ -1779,165 +1781,26 @@ export const useSyncStore = create((set, get) => ({
 // 用户登出由 authStore 自动处理，同步队列会检查认证状态
 ```
 
-## 8. 性能优化策略
+### 4.5 性能优化策略
 
-### 8.1 缓存策略
-- **本地缓存**: IndexedDB 作为一级缓存
-- **内存缓存**: Hook 状态作为二级缓存
-- **智能更新**: 只同步变更的数据
+## 5. 测试策略
 
-### 8.2 批量操作
-```javascript
-// 批量操作优化
-async function batchUpdate(operations) {
-  // 合并同类操作
-  const grouped = groupOperationsByType(operations);
-  
-  // 批量执行
-  for (const [type, ops] of Object.entries(grouped)) {
-    await executeBatchOperation(type, ops);
-  }
-}
-```
+## 6. 部署和监控
 
-### 8.3 懒加载
-- 只在需要时初始化 Supabase 连接
-- 按需加载远程数据
-- 分页加载大量数据
+## 7. 用户数据隔离和安全
 
-## 9. 测试策略
-
-### 9.1 单元测试
-- UnifiedStorage 核心逻辑测试
-- 数据转换函数测试
-- 同步机制测试
-
-### 9.2 集成测试
-- 登录/登出流程测试
-- 网络异常场景测试
-- 数据一致性验证
-
-### 9.3 E2E 测试
-- 完整用户流程测试
-- 多设备同步测试
-- 离线使用场景测试
-
-## 10. 部署和监控
-
-### 10.1 环境变量
-```env
-# Supabase 配置
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# 同步配置
-SYNC_INTERVAL_MS=300000  # 5分钟
-RETRY_MAX_ATTEMPTS=3
-BATCH_SIZE=50
-```
-
-### 10.2 监控指标
-- 同步成功率
-- 网络错误频率
-- 数据冲突次数
-- 用户操作延迟
-
-## 11. 实施时间表
-
-### 阶段1: 基础架构 (1-2周)
-- 创建 UnifiedStorage 统一存储架构和 Supabase 数据层
-- 实现基本的双写逻辑
-- 基础测试覆盖
-
-### 阶段2: 同步机制 (1-2周)
-- 实现数据同步逻辑
-- 冲突检测和解决
-- 离线队列处理
-
-### 阶段3: Hook 集成 (1周)
-- 改造现有 Hook
-- 保持接口兼容性
-- 集成测试
-
-### 阶段4: 优化和测试 (1周)
-- 性能优化
-- 全面测试
-- 文档完善
-
-总计：4-6周开发周期
-
-## 12. 用户数据隔离和安全
-
-### 12.1 数据隔离策略
+### 7.1 数据隔离策略
 - **Supabase RLS**: 使用行级安全策略确保用户只能访问自己的数据
 - **UUID 统一ID**: 本地和云端使用相同的 UUID，无需转换
 - **认证验证**: 所有操作都验证用户认证状态
 - **数据迁移**: 本地数据迁移到云端时自动添加用户ID
 
-### 12.2 关键安全点
-```javascript
-// 1. UnifiedStorage 自动处理用户ID
-// 在 UnifiedStorage 中，所有操作都会根据认证状态自动处理
 
-// 未登录用户：
-// - 所有操作仅写入 IndexedDB
-// - 不会创建同步队列项
-// - 体验与之前完全一致
-
-// 已登录用户：
-// - 操作先写入 IndexedDB（保证即时响应）
-// - 自动加入同步队列
-// - 后台同步时自动添加 user_id
-
-// 示例：任务添加时的用户ID处理
-// 在 UnifiedStorage 的 processSyncItem 方法中
-// 获取当前用户ID并添加到数据中
-processSyncItem: async (item) => {
-  const authStore = useAuthStore.getState();
-  const userId = authStore.user?.id;
-  if (!userId) return; // 未登录不处理
-  
-  // 同步到 Supabase 时自动添加 user_id
-  const dataWithUserId = {
-    ...item.changes,
-    user_id: userId
-  };
-  
-  await syncManager.syncTask(item.action, item.entityId, dataWithUserId);
-}
-
-// 2. Supabase 操作自动添加用户过滤
-export async function getSupabaseTasks(listId) {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', (await supabase.auth.getUser()).data.user.id)
-    .eq('list_id', listId)
-    .eq('deleted', false)
-    .order('quadrant')
-    .order('order');
-    
-  if (error) throw error;
-  return data;
-}
-```
-
-### 12.3 UUID 统一机制
-```javascript
-// 使用 UUID 后，本地和云端使用完全相同的 ID
-// 无需任何转换，大大简化了同步逻辑
-
-// ID 生成使用浏览器原生 API
-function generateId() {
-  return crypto.randomUUID();
-}
-```
-
-## 13. 未来版本改进计划
+## 8. 未来版本改进计划
 
 以下功能将在MVP版本稳定运行后，根据用户反馈在后续版本中考虑实现：
 
-### V2.0 计划功能
+### 远期计划功能
 1. **冲突解决增强**
    - 实现字段级别的三路合并
    - 或采用CRDT数据结构避免冲突
@@ -1957,69 +1820,13 @@ function generateId() {
    - 更智能的错误恢复机制
    - 减少对用户手动干预的依赖
 
-### V3.0 远期规划
-1. **协作功能**
+5. **协作功能**
    - 多用户共享任务列表
    - 实时协作编辑
 
-2. **高级同步**
+6. **高级同步**
    - 增量同步优化
    - 压缩传输数据
    - 支持离线时间过长的数据合并
 
-## 14. 四大原则的完整实现总结
 
-### 核心代码结构
-
-本文档的主要代码实现集中在 **3.2.4 UnifiedStorage** 和 **3.3 Supabase 数据层** 章节。
-其他章节引用这些核心实现，避免重复代码。
-
-### 原则实现对照表
-
-| 核心原则 | 架构体现 | 关键实现 | 用户受益 |
-|---------|---------|---------|---------|
-| **离线可用** | 本地优先读写 | 所有操作先落 IndexedDB | 断网时应用完全可用 |
-| **云端持久化** | 增量同步机制 | 只同步变更数据，后台执行 | 多设备数据一致，节省流量 |
-| **冲突最小化** | 时间戳+智能合并 | 自动解决99%冲突 | 无需手动处理冲突 |
-| **统一接口** | Provider模式 | 本地/远程同一接口 | 易测试、易扩展、易维护 |
-
-### 用户体验优势
-
-#### 1. **即时响应** (离线可用)
-```
-用户操作 → 本地立即更新 → UI立即响应 → 后台同步云端
-    ↓
-0延迟的用户体验
-```
-
-#### 2. **无感知同步** (云端持久化)
-```
-本地变更 → 记录时间戳 → 后台增量推送 → 云端持久化
-    ↓
-用户无感知的数据备份
-```
-
-#### 3. **智能合并** (冲突最小化)
-```
-多设备编辑 → 时间戳比较 → 字段级合并 → 透明解决冲突
-    ↓
-无需用户干预的数据一致性
-```
-
-#### 4. **可靠稳定** (统一接口)
-```
-接口标准化 → 独立测试 → 模块化设计 → 易于维护扩展
-    ↓
-高质量的软件架构
-```
-
-### 技术保障
-
-- **数据安全**: 用户数据完全隔离，RLS策略防护
-- **平滑迁移**: 本地数据无缝迁移到云端
-- **向下兼容**: 未登录用户体验完全不变
-- **跨设备同步**: 登录用户数据实时同步
-- **离线工作**: 网络异常时完全依赖本地存储
-- **自动恢复**: 网络恢复后自动处理同步队列
-
-这个设计确保了应用在各种网络环境下都能提供最佳的用户体验，同时保持代码的可维护性和可扩展性。
