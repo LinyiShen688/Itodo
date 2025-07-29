@@ -20,7 +20,7 @@ export function useDebounce(callback, delay, deps = []) {
     timeoutRef.current = setTimeout(() => {
       callback(...args);
     }, delay);
-  }, [callback, delay, ...deps]);
+  }, [callback, delay, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /**
@@ -54,7 +54,7 @@ export function useDebounceLeading(callback, delay, deps = []) {
       lastCallTimeRef.current = Date.now();
       callback(...args);
     }, delay);
-  }, [callback, delay, ...deps]);
+  }, [callback, delay, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /**
@@ -74,5 +74,5 @@ export function useThrottle(callback, delay, deps = []) {
       lastCallTimeRef.current = now;
       callback(...args);
     }
-  }, [callback, delay, ...deps]);
+  }, [callback, delay, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
 }

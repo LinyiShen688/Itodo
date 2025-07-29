@@ -1,11 +1,12 @@
 import { openDB } from "idb";
 
 const DB_NAME = "iTodoApp";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const STORES = {
   TASKS: "tasks",
   TASK_LISTS: "taskLists",
+  SYNC_QUEUE: "syncQueue",
 };
 
 // 数据库初始化
@@ -100,6 +101,21 @@ export async function initDB() {
             cursor.continue();
           }
         };
+      }
+
+      // 版本5升级：添加同步队列存储
+      if (oldVersion < 5) {
+        // 创建同步队列存储
+        if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
+          const queueStore = db.createObjectStore(STORES.SYNC_QUEUE, {
+            keyPath: "id",
+          });
+          // 创建索引
+          queueStore.createIndex("status", "status");
+          queueStore.createIndex("createdAt", "createdAt");
+          queueStore.createIndex("entityType", "entityType");
+          queueStore.createIndex("action", "action");
+        }
       }
     },
   });
