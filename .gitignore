@@ -43,3 +43,8 @@ next-env.d.ts
 
 .cursor
 .history
+
+.claude
+.claude_code
+
+.vscode
