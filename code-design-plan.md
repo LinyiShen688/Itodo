@@ -1214,8 +1214,9 @@ async function handleUserOperation(operation) {
   // 2. 立即更新 UI
   updateUI(localResult);
   
-  // 3. 如果已登录，加入同步队列
+  // 3. 如果已登录，将操作加入同步队列
   if (isAuthenticated()) {
+    // 将本地操作加入队列，以便后续同步
     await addToSyncQueue({
       action: operation.type,
       entityType: operation.entityType,
@@ -1223,8 +1224,25 @@ async function handleUserOperation(operation) {
       data: operation.data
     });
     
-    // 4. 立即尝试同步（非阻塞）
-    processQueueInBackground();
+    // 4. 如果在线，立即执行同步流程（非阻塞）
+    if (navigator.onLine) {
+      setTimeout(async () => {
+        try {
+          // 复用 UnifiedStorage 的同步逻辑
+          const unifiedStorage = get(); // 获取 UnifiedStorage 实例
+          
+          // Pull: 拉取云端变更
+          await unifiedStorage.pullRemoteChanges(getUserId());
+          
+          // Push: 处理本地变更队列（包括刚才加入的操作）
+          const authStore = useAuthStore.getState();
+          await unifiedStorage.processQueue(authStore);
+        } catch (error) {
+          console.error('后台同步失败:', error);
+          // 失败时会保留在队列中，下次同步时重试
+        }
+      }, 0);
+    }
   }
   
   return localResult;
@@ -1241,22 +1259,12 @@ const SYNC_TRIGGERS = {
 };
 ```
 
-2. **用户登录时自动同步（次要触发机制）**:
+2. **用户登录时自动同步（复用 onUserLogin）**:
 ```javascript
-// 登录成功后的同步流程
-async function onLoginSuccess(user) {
-  // 1. 初始化同步队列管理器
-  await initSyncQueue(user.id);
-  
-  // 2. 检查是否需要数据迁移
-  const needsMigration = await checkMigrationNeeded(user.id);
-  if (needsMigration) {
-    await migrateLocalDataToSupabase(user.id);
-  }
-  
-  // 3. 处理未同步的本地变更
-  await processExistingSyncQueue();
-}
+// 直接使用 UnifiedStorage 中已实现的 onUserLogin
+// 该函数已经正确实现了 pull-merge-push 流程
+const unifiedStorage = get();
+await unifiedStorage.onUserLogin(user);
 ```
 
 3. **网络恢复时自动同步（辅助触发机制）**:
@@ -1264,14 +1272,36 @@ async function onLoginSuccess(user) {
 // 网络状态监听
 window.addEventListener('online', async () => {
   if (isAuthenticated()) {
-    console.log('网络恢复，开始处理同步队列...');
-    await processExistingSyncQueue();
+    console.log('网络恢复，执行完整同步...');
+    
+    try {
+      const unifiedStorage = get();
+      const userId = getUserId();
+      
+      // 复用同步逻辑：先 pull 再 push
+      await unifiedStorage.pullRemoteChanges(userId);
+      
+      const authStore = useAuthStore.getState();
+      await unifiedStorage.processQueue(authStore);
+    } catch (error) {
+      console.error('网络恢复同步失败:', error);
+    }
   }
 });
 
-// 检测网络状态
+// 检测网络状态（工具函数）
 function isOnline() {
   return navigator.onLine;
+}
+
+// 获取当前用户 ID（工具函数）
+function getUserId() {
+  return useAuthStore.getState().user?.id;
+}
+
+// 检查是否已认证（工具函数）
+function isAuthenticated() {
+  return !!useAuthStore.getState().user;
 }
 ```
 
@@ -1282,24 +1312,30 @@ const SYNC_CONDITIONS = {
   // 主要触发
   USER_OPERATION: {
     when: '用户执行 CRUD 操作后',
-    action: '立即尝试同步',
-    fallback: '失败时进入队列'
+    action: '执行完整 pull-merge-push 流程',
+    implementation: 'handleUserOperation() → pullRemoteChanges() → processQueue()',
+    nonBlocking: true // 使用 setTimeout 避免阻塞 UI
   },
   
   // 次要触发  
   USER_LOGIN: {
     when: '用户登录成功后',
-    action: '先拉取云端数据，再处理本地队列',
-    includes: '数据迁移 + Pull + Conflict + Push'
+    action: '调用 UnifiedStorage.onUserLogin()',
+    flow: '数据迁移检查 → Pull云端数据 → 处理本地队列',
+    includes: 'checkMigrationNeeded() + pullRemoteChanges() + processQueue()'
   },
   
   // 辅助触发
   NETWORK_RECOVERY: {
     when: '网络从离线恢复在线',
-    action: '自动处理积压队列',
+    action: '执行完整同步流程',
+    flow: 'pullRemoteChanges() → processQueue()',
     condition: '仅当已登录时'
   }
 };
+
+// 核心原则：所有同步都遵循 Pull-Merge-Push
+// 不再使用简单的队列推送，而是完整的双向同步
 ```
 
 #### 简化同步策略
@@ -1394,67 +1430,12 @@ const USER_ACTIONS = {
    - ✅ **用户自主决策**：系统不作任何隐藏的自动处理
    - ✅ **低心智负担**：用户不需要理解复杂的冲突解决机制
 
-#### 数据同步流程
+
+
+#### UI 过滤规则
 ```javascript
-async function syncData() {
-  // 1. 检查网络状态
-  if (!navigator.onLine) return;
 
-  // 2. 获取本地和远程数据
-  const localData = await getLocalData();
-  const remoteData = await getRemoteData();
-
-  // 3. 比较数据版本
-  const conflicts = detectConflicts(localData, remoteData);
-
-  // 4. 解决冲突
-  if (conflicts.length > 0) {
-    await resolveConflicts(conflicts);
-  }
-
-  // 5. 同步数据
-  await performSync();
-
-  // 6. 更新同步状态
-  updateSyncStatus(SYNC_STATUS.IDLE);
-}
-```
-
-#### UUID 同步实现
-使用 UUID 后，同步逻辑大大简化：
-
-```javascript
-// 同步本地数据到远程
-export async function syncLocalToRemote(userId) {
-  const unsyncedTasks = await getUnsyncedTasks();
-  
-  for (const task of unsyncedTasks) {
-    // 直接 upsert，使用相同的 UUID
-    // 包括 deleted=2 的墓碑数据也一起同步
-    await supabase.from('tasks').upsert({
-      id: task.id,              // 相同的 UUID，无需转换！
-      user_id: userId,
-      ...task
-    });
-  }
-}
-
-// 同步远程数据到本地
-export async function syncRemoteToLocal(userId, lastSyncTime) {
-  const { data: remoteTasks } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', userId)
-    .gt('updated_at', lastSyncTime);
-  
-  for (const remoteTask of remoteTasks) {
-    // ID 完全一致，直接更新
-    // 包括 deleted=2 的墓碑数据也直接 upsert
-    await updateLocalTask(remoteTask.id, remoteTask);
-  }
-}
-
-// UI 过滤规则
+// 
 export function filterTasksForDisplay(tasks, view) {
   const DELETE_STATUS = {
     NORMAL: 0,
