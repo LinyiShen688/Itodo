@@ -214,7 +214,7 @@ export function generateId() {
 **IndexedDB 同步队列创建**:
 ```javascript
 // 在 src/lib/indexeddb.js 中添加
-const DB_VERSION = 4; // 从3升级到4  
+const DB_VERSION = 5; // 从4升级到5  
 
 const STORES = {
   TASKS: "tasks",
@@ -302,19 +302,19 @@ export async function addToQueue(operation) {
     retryCount: 0
   };
   
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   return await db.add('syncQueue', queueItem);
 }
 
 // 获取待处理项
 export async function getPendingItems() {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   return await db.getAllFromIndex('syncQueue', 'status', 'pending');
 }
 
 // 更新队列项状态
 export async function updateItemStatus(itemId, status, error = null) {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   const item = await db.get('syncQueue', itemId);
   if (item) {
     item.status = status;
@@ -326,7 +326,7 @@ export async function updateItemStatus(itemId, status, error = null) {
 
 // 更新队列项
 export async function updateItem(itemId, updates) {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   const item = await db.get('syncQueue', itemId);
   if (item) {
     Object.assign(item, updates);
@@ -336,7 +336,7 @@ export async function updateItem(itemId, updates) {
 
 // 获取同步状态汇总
 export async function getSyncStatus() {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   const [pending, processing, failed, completed] = await Promise.all([
     db.getAllFromIndex('syncQueue', 'status', 'pending'),
     db.getAllFromIndex('syncQueue', 'status', 'processing'),
@@ -354,13 +354,13 @@ export async function getSyncStatus() {
 
 // 删除队列项
 export async function deleteQueueItem(itemId) {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   return await db.delete('syncQueue', itemId);
 }
 
 // 常用查询操作示例
 export async function getQueueOperations() {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   
   // 获取待处理的同步项
   const pendingItems = await db.getAllFromIndex('syncQueue', 'status', 'pending');
@@ -994,7 +994,7 @@ async function applyRemoteChange(entityType, remoteData) {
 
 // 清理无效队列项
 async function clearInvalidQueueItems(entityId) {
-  const db = await openDB('iTodoApp', 4);
+  const db = await openDB('iTodoApp', 5);
   const tx = db.transaction('syncQueue', 'readwrite');
   const store = tx.objectStore('syncQueue');
   
