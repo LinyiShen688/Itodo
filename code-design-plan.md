@@ -1,5 +1,22 @@
 # iTodo 混合存储代码设计方案
 
+## 代码引用索引
+
+主要代码实现位置：
+- [UnifiedStorage 完整实现](#unified-storage) - 3.2.4 节
+  - [pullRemoteData](#pullRemoteData) - 拉取远程数据
+  - [applyRemoteData](#applyRemoteData) - 应用远程数据
+  - [applyRemoteChange](#applyRemoteChange) - 冲突处理
+  - [clearInvalidQueueItems](#clearInvalidQueueItems) - 清理队列
+  - [processQueue](#processQueue) - 处理同步队列
+- [数据转换函数](#dataConverters) - 3.3 节
+  - convertIndexedDBToSupabase
+  - convertSupabaseToIndexedDB
+- [时区处理函数](#timezone-handling) - 3.4 节
+  - normalizeToUTC
+  - toUTCMillis
+  - compareTimestamps
+
 ## 1. MVP简化版设计理念
 
 ### 核心设计原则
@@ -108,56 +125,15 @@ async function addTask(taskData) {
 
 
 #### 冲突最小化 (Auto-Merge) - 时区安全的 LWW
-```javascript
-// 自动冲突解决机制（时区统一的 Last-Write-Wins）
-async function resolveConflict(localData, remoteData) {
-  // 关键：确保时间戳比较在统一时区下进行
-  const localTimestamp = normalizeToUTC(localData.updatedAt);
-  const remoteTimestamp = normalizeToUTC(remoteData.updated_at);
-  
-  // 1. 时间戳比较 - 最后写入获胜（UTC时间比较）
-  if (localTimestamp > remoteTimestamp) {
-    return { resolved: localData, strategy: 'local-wins' };
-  }
-  
-  if (remoteTimestamp > localTimestamp) {
-    return { resolved: remoteData, strategy: 'remote-wins' };
-  }
-  
-  // 2. 智能字段合并 (相同时间戳时)
-  const merged = {
-    ...localData,
-    ...remoteData,
-    // 保留最新的字段值
-    text: remoteData.text || localData.text,
-    completed: remoteData.completed !== undefined ? remoteData.completed : localData.completed,
-    updatedAt: Math.max(localTimestamp, remoteTimestamp)
-  };
-  
-  return { resolved: merged, strategy: 'auto-merge' };
-}
 
-// 时区统一工具函数
-function normalizeToUTC(timestamp) {
-  if (timestamp instanceof Date) {
-    return timestamp.getTime(); // 返回UTC毫秒数
-  }
-  if (typeof timestamp === 'string') {
-    return new Date(timestamp).getTime(); // ISO字符串自动解析为UTC
-  }
-  return timestamp; // 假设已经是毫秒时间戳
-}
+在冲突解决中，我们采用 Last-Write-Wins (LWW) 策略，并确保所有时间戳比较都在 UTC 时区下进行。
 
-// 确保本地数据库写入使用UTC时间
-function createTaskWithUTCTimestamp(taskData) {
-  const now = new Date(); // JavaScript Date对象内部就是UTC
-  return {
-    ...taskData,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-```
+关键实现：
+- 使用 `normalizeToUTC()` 统一时间戳格式
+- 比较 UTC 毫秒数，避免时区差异
+- 相同时间戳时进行智能字段合并
+
+完整时区处理实现见 [3.4 时区统一处理](#timezone-handling)
 
 
 ## 3. 核心模块设计
@@ -254,6 +230,7 @@ pending    → processing → completed
 - 管理网络状态监听
 - 处理数据格式转换
 
+##### <a id="unified-storage"></a>
 ##### 3.2.4 UnifiedStorage（协调层）
 **文件位置**: `src/lib/unified-storage.js`
 **职责**:
@@ -645,6 +622,7 @@ export const useUnifiedStorage = create((set, get) => ({
     return deletedList;
   },
 
+  // <a id="processQueue"></a>
   // 队列处理
   processQueue: async (authStore) => {
     if (syncManager.getProcessing() || !navigator.onLine || !authStore.isAuthenticated()) {
@@ -716,16 +694,20 @@ export const useUnifiedStorage = create((set, get) => ({
       await migrateLocalDataToSupabase(user.id);
     }
     
-    // 关键：先拉取云端数据
-    await get().pullRemoteChanges(user.id);
+    // 1. 拉取远程数据
+    const remoteData = await get().pullRemoteData(user.id);
     
-    // 然后处理积压的同步队列
+    // 2. 应用远程数据到本地
+    await get().applyRemoteData(remoteData);
+    
+    // 3. 处理同步队列，推送本地数据到远程
     const authStore = useAuthStore.getState();
     await get().processQueue(authStore);
   },
   
-  // 拉取远程变更（含冲突处理）
-  pullRemoteChanges: async (userId) => {
+  // <a id="pullRemoteData"></a>
+  // 拉取远程数据（只负责获取数据）
+  pullRemoteData: async (userId) => {
     const lastPullTime = localStorage.getItem(`last_pull_${userId}`) || '1970-01-01';
     
     try {
@@ -749,28 +731,60 @@ export const useUnifiedStorage = create((set, get) => ({
         
       if (listsError) throw listsError;
       
-      // 3. 先处理任务列表（避免外键约束）
-      for (const remoteList of remoteTaskLists || []) {
-        await get().applyRemoteChange('taskList', remoteList);
-      }
-      
-      // 4. 再处理任务
-      for (const remoteTask of remoteTasks || []) {
-        await get().applyRemoteChange('task', remoteTask);
-      }
-      
-      // 5. 更新拉取时间
-      localStorage.setItem(`last_pull_${userId}`, new Date().toISOString());
+      // 3. 返回获取的数据
+      return {
+        tasks: remoteTasks || [],
+        taskLists: remoteTaskLists || [],
+        userId,
+        lastPullTime: new Date().toISOString()
+      };
       
     } catch (error) {
-      console.error('Pull remote changes failed:', error);
-      // 不阻止后续的队列处理
+      console.error('Pull remote data failed:', error);
+      // 返回空数据，不阻止后续流程
+      return {
+        tasks: [],
+        taskLists: [],
+        userId,
+        error
+      };
     }
   },
   
-  // 应用远程变更（核心冲突处理）
+  // <a id="applyRemoteData"></a>
+  // 应用远程数据到本地（包含冲突处理）
+  applyRemoteData: async (remoteData) => {
+    if (!remoteData || remoteData.error) {
+      console.log('No remote data to apply');
+      return;
+    }
+    
+    try {
+      // 1. 先处理任务列表（避免外键约束）
+      for (const remoteList of remoteData.taskLists) {
+        await get().applyRemoteChange('taskList', remoteList);
+      }
+      
+      // 2. 再处理任务
+      for (const remoteTask of remoteData.tasks) {
+        await get().applyRemoteChange('task', remoteTask);
+      }
+      
+      // 3. 更新拉取时间
+      if (remoteData.userId && remoteData.lastPullTime) {
+        localStorage.setItem(`last_pull_${remoteData.userId}`, remoteData.lastPullTime);
+      }
+      
+    } catch (error) {
+      console.error('Apply remote data failed:', error);
+      throw error;
+    }
+  },
+  
+  // <a id="applyRemoteChange"></a>
+  // 应用单个远程变更（核心冲突处理）
   applyRemoteChange: async (entityType, remoteData) => {
-    // 转换数据格式
+    // 转换数据格式 - 使用 convertSupabaseToIndexedDB（实现见 3.3 节）
     const localFormat = convertSupabaseToIndexedDB(remoteData);
     
     // 获取本地数据
@@ -789,6 +803,7 @@ export const useUnifiedStorage = create((set, get) => ({
     }
     
     // 场景2：本地存在，进行冲突检测
+    // 使用 normalizeToUTC 确保时区一致（实现见 3.4 节）
     const localTime = normalizeToUTC(localData.updatedAt);
     const remoteTime = normalizeToUTC(remoteData.updated_at);
     
@@ -806,6 +821,7 @@ export const useUnifiedStorage = create((set, get) => ({
     // 如果本地更新，保持本地数据，等待队列推送
   },
   
+  // <a id="clearInvalidQueueItems"></a>
   // 清理无效的队列项
   clearInvalidQueueItems: async (entityId) => {
     const pendingItems = await queueManager.getPendingItems();
@@ -859,7 +875,8 @@ export async function batchInsertTaskLists(taskLists, userId)
 // 用户数据管理
 export async function getUserDataExists(userId)  // 检查用户数据是否存在
 
-// 工具函数
+// <a id="dataConverters"></a>
+// 数据格式转换工具函数
 export function convertIndexedDBToSupabase(data, userId) {
   // 任务转换
   if (data.text !== undefined) {
@@ -978,6 +995,7 @@ export async function addSupabaseTaskWithValidation(taskData) {
 }
 ```
 
+### <a id="timezone-handling"></a>
 ### 3.4 时区统一处理
 
 #### 时区问题的重要性
@@ -1015,6 +1033,17 @@ export function toUTCMillis(timestamp) {
   return timestamp;
 }
 
+// normalizeToUTC - 在 applyRemoteChange 中使用的时区统一函数
+export function normalizeToUTC(timestamp) {
+  if (timestamp instanceof Date) {
+    return timestamp.getTime(); // 返回UTC毫秒数
+  }
+  if (typeof timestamp === 'string') {
+    return new Date(timestamp).getTime(); // ISO字符串自动解析为UTC
+  }
+  return timestamp; // 假设已经是毫秒时间戳
+}
+
 // 安全的时间戳比较
 export function compareTimestamps(timestamp1, timestamp2) {
   const t1 = toUTCMillis(timestamp1);
@@ -1033,137 +1062,51 @@ function updateTaskWithTimestamp(taskData) {
 
 ### 3.5 同步机制设计
 
-#### 完整同步流程：Pull-Conflict-Push
+#### 完整同步流程：Pull-Apply-Push
 
-**核心原则**：先拉取、处理冲突、再推送，确保数据一致性。
+**核心原则**：拉取远程数据、应用到本地（包含冲突处理）、推送本地变更，确保数据一致性。
 
 ##### 同步时序图
 ```
-用户登录 → 数据迁移（如需） → Pull（拉取） → Conflict（冲突处理） → Push（推送）
-                               ↓                      ↓
-                          从云端获取更新        清理无效队列项
+用户登录 → 数据迁移（如需） → Pull（拉取） → Apply（应用） → Push（推送）
+                               ↓                  ↓
+                          从云端获取数据    冲突处理+清理队列
 ```
 
 ##### 详细流程
 
-1. **Pull阶段：拉取云端更新**
+1. **Pull阶段：拉取云端数据**
    - 基于 `last_pull_time` 获取增量数据
+   - 获取 task_lists 和 tasks
+   - 返回结构化的远程数据
+   - 不做任何本地修改
+   - 完整实现见 [3.2.4 UnifiedStorage - pullRemoteData](#pullRemoteData)
+
+2. **Apply阶段：应用远程数据到本地**
    - 先处理 task_lists（避免外键约束）
    - 再处理 tasks
+   - 每个数据项都进行冲突检测：
+     - 云端新数据 → 直接插入本地
+     - 云端更新数据 → LWW 冲突解决
+     - 若云端覆盖本地 → **清理相关队列项**
    - 更新拉取时间戳
-
-2. **Conflict阶段：冲突检测与处理**
-   - 云端新数据 → 直接插入本地
-   - 云端更新数据 → LWW 冲突解决
-   - 若云端覆盖本地 → **清理相关队列项**
+   - 完整实现见 [3.2.4 UnifiedStorage - applyRemoteData](#applyRemoteData)
 
 3. **Push阶段：处理同步队列**
    - 按队列顺序推送操作
    - 已被清理的队列项自动跳过
    - 成功后标记为 completed
+   - 完整实现见 [3.2.4 UnifiedStorage - processQueue](#processQueue)
 
-##### Pull-Conflict-Push 核心实现
+##### Pull-Apply-Push 核心实现
 
-1. **Pull 阶段 - 获取云端更新**:
-```javascript
-async function pullRemoteChanges(userId) {
-   const lastPullTime = localStorage.getItem(`last_pull_${userId}`) || '1970-01-01';
-    
-    try {
-      // 1. 获取云端更新的任务
-      const { data: remoteTasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', userId)
-        .gt('updated_at', lastPullTime)
-        .order('updated_at', { ascending: true });
-        
-      if (tasksError) throw tasksError;
-      
-      // 2. 获取云端更新的任务列表
-      const { data: remoteTaskLists, error: listsError } = await supabase
-        .from('task_lists')
-        .select('*')
-        .eq('user_id', userId)
-        .gt('updated_at', lastPullTime)
-        .order('updated_at', { ascending: true });
-        
-      if (listsError) throw listsError;
-      
-      // 3. 先处理任务列表（避免外键约束）
-      for (const remoteList of remoteTaskLists || []) {
-        await get().applyRemoteChange('taskList', remoteList);
-      }
-      
-      // 4. 再处理任务
-      for (const remoteTask of remoteTasks || []) {
-        await get().applyRemoteChange('task', remoteTask);
-      }
-      
-      // 5. 更新拉取时间
-      localStorage.setItem(`last_pull_${userId}`, new Date().toISOString());
-      
-    } catch (error) {
-      console.error('Pull remote changes failed:', error);
-      // 不阻止后续的队列处理
-    }
-}
+核心实现代码见 [3.2.4 UnifiedStorage](#unified-storage) 中的：
+- `pullRemoteData` - 拉取远程数据
+- `applyRemoteData` - 应用远程数据到本地
+- `applyRemoteChange` - 单个数据项的冲突处理
+- `clearInvalidQueueItems` - 清理无效队列项
 
-  
-```
-
-2. **Conflict 阶段 - 冲突处理与队列清理**:
-```javascript
-async function applyRemoteChange(entityType, remoteData) {
-  // 转换数据格式（下划线 → 驼峰）
-  const localFormat = convertSupabaseToIndexedDB(remoteData);
-  
-  // 获取本地数据
-  const localData = await getLocalData(entityType, localFormat.id);
-  
-  if (!localData) {
-    // 无冲突：直接插入
-    await insertLocalData(entityType, localFormat);
-    return;
-  }
-  
-  // 冲突检测：基于时间戳
-  const localTime = new Date(localData.updatedAt).getTime();
-  const remoteTime = new Date(remoteData.updated_at).getTime();
-  
-  if (remoteTime > localTime) {
-    // 云端较新，覆盖本地
-    await updateLocalData(entityType, localFormat.id, localFormat);
-    
-    // 关键：清理被覆盖实体的同步队列项
-    await clearInvalidQueueItems(localFormat.id);
-  }
-  // 本地较新：保留本地，等待 Push
-}
-
-// 清理无效队列项
-async function clearInvalidQueueItems(entityId) {
-  const db = await openDB('iTodoApp', 5);
-  const tx = db.transaction('syncQueue', 'readwrite');
-  const store = tx.objectStore('syncQueue');
-  
-  // 查找该实体的所有 pending 队列项
-  const index = store.index('status');
-  const pendingItems = await index.getAll('pending');
-  
-  // 删除相关队列项
-  for (const item of pendingItems) {
-    if (item.entityId === entityId) {
-      await store.delete(item.id);
-      console.log(`清理无效队列项: ${item.id}`);
-    }
-  }
-  
-  await tx.done;
-}
-```
-
-3. **为什么要清理队列项？**
+4. **为什么要清理队列项？**
 
 场景示例：
 1. 本地：任务 A 的文本 = "TODO"，更新时间 10:00
@@ -1179,7 +1122,7 @@ async function clearInvalidQueueItems(entityId) {
 - **冲突解决确定性**：LWW 策略保证结果可预测
 - **队列清理及时性**：避免过时操作覆盖新数据
 
-#### MVP简化版同步时机策略
+#### 同步时机策略
 
 **采用事件驱动 + 登录触发的同步策略**：
 
@@ -1202,143 +1145,7 @@ async function clearInvalidQueueItems(entityId) {
    - ❌ 不使用应用启动时的主动检查
    - ✅ 完全基于用户行为和网络状态的被动同步
 
-##### 同步时机实现代码
-
-1. **用户操作后立即同步（主要触发机制）**:
-```javascript
-// 所有用户操作后的同步流程
-async function handleUserOperation(operation) {
-  // 1. 立即写入本地 IndexedDB
-  const localResult = await executeLocalOperation(operation);
-  
-  // 2. 立即更新 UI
-  updateUI(localResult);
-  
-  // 3. 如果已登录，将操作加入同步队列
-  if (isAuthenticated()) {
-    // 将本地操作加入队列，以便后续同步
-    await addToSyncQueue({
-      action: operation.type,
-      entityType: operation.entityType,
-      entityId: operation.entityId,
-      data: operation.data
-    });
-    
-    // 4. 如果在线，立即执行同步流程（非阻塞）
-    if (navigator.onLine) {
-      setTimeout(async () => {
-        try {
-          // 复用 UnifiedStorage 的同步逻辑
-          const unifiedStorage = get(); // 获取 UnifiedStorage 实例
-          
-          // Pull: 拉取云端变更
-          await unifiedStorage.pullRemoteChanges(getUserId());
-          
-          // Push: 处理本地变更队列（包括刚才加入的操作）
-          const authStore = useAuthStore.getState();
-          await unifiedStorage.processQueue(authStore);
-        } catch (error) {
-          console.error('后台同步失败:', error);
-          // 失败时会保留在队列中，下次同步时重试
-        }
-      }, 0);
-    }
-  }
-  
-  return localResult;
-}
-
-// 支持的操作类型
-const SYNC_TRIGGERS = {
-  ADD_TASK: 'add_task',
-  UPDATE_TASK: 'update_task', 
-  DELETE_TASK: 'delete_task',
-  ADD_TASK_LIST: 'add_task_list',
-  UPDATE_TASK_LIST: 'update_task_list',
-  DELETE_TASK_LIST: 'delete_task_list'
-};
-```
-
-2. **用户登录时自动同步（复用 onUserLogin）**:
-```javascript
-// 直接使用 UnifiedStorage 中已实现的 onUserLogin
-// 该函数已经正确实现了 pull-merge-push 流程
-const unifiedStorage = get();
-await unifiedStorage.onUserLogin(user);
-```
-
-3. **网络恢复时自动同步（辅助触发机制）**:
-```javascript
-// 网络状态监听
-window.addEventListener('online', async () => {
-  if (isAuthenticated()) {
-    console.log('网络恢复，执行完整同步...');
-    
-    try {
-      const unifiedStorage = get();
-      const userId = getUserId();
-      
-      // 复用同步逻辑：先 pull 再 push
-      await unifiedStorage.pullRemoteChanges(userId);
-      
-      const authStore = useAuthStore.getState();
-      await unifiedStorage.processQueue(authStore);
-    } catch (error) {
-      console.error('网络恢复同步失败:', error);
-    }
-  }
-});
-
-// 检测网络状态（工具函数）
-function isOnline() {
-  return navigator.onLine;
-}
-
-// 获取当前用户 ID（工具函数）
-function getUserId() {
-  return useAuthStore.getState().user?.id;
-}
-
-// 检查是否已认证（工具函数）
-function isAuthenticated() {
-  return !!useAuthStore.getState().user;
-}
-```
-
-##### 同步时机总结
-```javascript
-// MVP 简化版同步触发条件
-const SYNC_CONDITIONS = {
-  // 主要触发
-  USER_OPERATION: {
-    when: '用户执行 CRUD 操作后',
-    action: '执行完整 pull-merge-push 流程',
-    implementation: 'handleUserOperation() → pullRemoteChanges() → processQueue()',
-    nonBlocking: true // 使用 setTimeout 避免阻塞 UI
-  },
-  
-  // 次要触发  
-  USER_LOGIN: {
-    when: '用户登录成功后',
-    action: '调用 UnifiedStorage.onUserLogin()',
-    flow: '数据迁移检查 → Pull云端数据 → 处理本地队列',
-    includes: 'checkMigrationNeeded() + pullRemoteChanges() + processQueue()'
-  },
-  
-  // 辅助触发
-  NETWORK_RECOVERY: {
-    when: '网络从离线恢复在线',
-    action: '执行完整同步流程',
-    flow: 'pullRemoteChanges() → processQueue()',
-    condition: '仅当已登录时'
-  }
-};
-
-// 核心原则：所有同步都遵循 Pull-Merge-Push
-// 不再使用简单的队列推送，而是完整的双向同步
-```
-
-#### 简化同步策略
+##### 简化同步结构
 ```javascript
 // 队列项状态（简化版）
 const QUEUE_STATUS = {
@@ -1368,7 +1175,117 @@ interface QueueItem {
 }
 ```
 
-#### MVP失败同步处理策略
+
+##### 同步时机实现代码
+
+1. **用户操作后立即同步（主要触发机制）**:
+```javascript
+// 所有用户操作后的同步流程
+async function handleUserOperation(operation) {
+  // 1. 立即写入本地 IndexedDB
+  const localResult = await executeLocalOperation(operation);
+  
+  // 2. 立即更新 UI
+  updateUI(localResult);
+  
+  // 3. 如果已登录，将操作加入同步队列
+  if (isAuthenticated()) {
+    // 将本地操作加入队列，以便后续同步
+    await addToSyncQueue({
+      action: operation.type,
+      entityType: operation.entityType,
+      entityId: operation.entityId,
+      data: operation.data
+    });
+    
+    // 4. 如果在线，立即执行同步流程（非阻塞）
+    if (navigator.onLine) {
+      setTimeout(async () => {
+        try {
+          // 复用 UnifiedStorage 的同步逻辑
+          const unifiedStorage = get(); // 获取 UnifiedStorage 实例
+          const userId = getUserId();
+          
+          // 1. Pull: 拉取云端数据
+          const remoteData = await unifiedStorage.pullRemoteData(userId);
+          
+          // 2. Apply: 应用远程数据到本地
+          await unifiedStorage.applyRemoteData(remoteData);
+          
+          // 3. Push: 处理本地变更队列（包括刚才加入的操作）
+          const authStore = useAuthStore.getState();
+          await unifiedStorage.processQueue(authStore);
+        } catch (error) {
+          console.error('后台同步失败:', error);
+          // 失败时会保留在队列中，下次同步时重试
+        }
+      }, 0);
+    }
+  }
+  
+  return localResult;
+}
+
+// 支持的操作类型
+const SYNC_TRIGGERS = {
+  ADD_TASK: 'add_task',
+  UPDATE_TASK: 'update_task', 
+  DELETE_TASK: 'delete_task',
+  ADD_TASK_LIST: 'add_task_list',
+  UPDATE_TASK_LIST: 'update_task_list',
+  DELETE_TASK_LIST: 'delete_task_list'
+};
+```
+
+2. **用户登录时自动同步（复用 onUserLogin）**:
+```javascript
+// 直接使用 UnifiedStorage 中已实现的 onUserLogin
+// 该函数已经正确实现了 pull-apply-push 流程
+const unifiedStorage = get();
+await unifiedStorage.onUserLogin(user);
+```
+
+3. **网络恢复时自动同步（辅助触发机制）**:
+
+网络恢复同步已在 UnifiedStorage 中通过 `syncManager.initNetworkListener()` 实现。
+恢复时会自动执行完整的 Pull-Apply-Push 流程。
+
+##### 同步时机总结
+```javascript
+// MVP 简化版同步触发条件
+const SYNC_CONDITIONS = {
+  // 主要触发
+  USER_OPERATION: {
+    when: '用户执行 CRUD 操作后',
+    action: '执行完整 pull-merge-push 流程',
+    implementation: 'handleUserOperation() → pullRemoteData() → applyRemoteData() → processQueue()',
+    nonBlocking: true // 使用 setTimeout 避免阻塞 UI
+  },
+  
+  // 次要触发  
+  USER_LOGIN: {
+    when: '用户登录成功后',
+    action: '调用 UnifiedStorage.onUserLogin()',
+    flow: '数据迁移检查 → Pull云端数据 → 处理本地队列',
+    includes: 'checkMigrationNeeded() + pullRemoteData() + applyRemoteData() + processQueue()'
+  },
+  
+  // 辅助触发
+  NETWORK_RECOVERY: {
+    when: '网络从离线恢复在线',
+    action: '执行完整同步流程',
+    flow: 'pullRemoteData() → applyRemoteData() → processQueue()',
+    condition: '仅当已登录时'
+  }
+};
+
+// 核心原则：所有同步都遵循 Pull-Apply-Push
+// 不再使用简单的队列推送，而是完整的双向同步
+```
+
+
+
+#### 失败同步处理策略
 
 **用户界面驱动的异常处理方式**：
 
@@ -1432,55 +1349,6 @@ const USER_ACTIONS = {
 
 
 
-#### UI 过滤规则
-```javascript
-
-// 
-export function filterTasksForDisplay(tasks, view) {
-  const DELETE_STATUS = {
-    NORMAL: 0,
-    TRASH: 1,
-    TOMBSTONE: 2
-  };
-  
-  switch (view) {
-    case 'normal':
-      // 正常列表：只显示 deleted === 0 的任务
-      return tasks.filter(task => task.deleted === DELETE_STATUS.NORMAL);
-    case 'trash':
-      // 收纳箱：只显示 deleted === 1 的任务
-      return tasks.filter(task => task.deleted === DELETE_STATUS.TRASH);
-    default:
-      // 默认不显示 deleted === 2 的墓碑数据
-      return tasks.filter(task => task.deleted !== DELETE_STATUS.TOMBSTONE);
-  }
-}
-
-// TaskLists 过滤规则
-export function filterTaskListsForDisplay(taskLists) {
-  const DELETE_STATUS = {
-    NORMAL: 0,
-    TOMBSTONE: 2  // TaskLists 只有正常和墓碑两种状态
-  };
-  
-  // 只显示未删除的任务列表
-  return taskLists.filter(list => list.deleted !== DELETE_STATUS.TOMBSTONE);
-}
-
-// 本地创建任务示例
-const newTask = {
-  id: generateId(), // "550e8400-e29b-41d4-a716-446655440000"
-  text: "新任务",
-  // ... 其他字段
-};
-
-// 同步到云端时，直接使用相同的ID
-await supabase.from('tasks').insert({
-  id: newTask.id,   // 相同的 UUID，无需转换！
-  user_id: userId,
-  ...convertToSupabaseFormat(newTask)
-});
-```
 
 ### 3.6 同步进度弹窗设计
 
@@ -1489,6 +1357,15 @@ await supabase.from('tasks').insert({
 
 #### 功能设计
 通过用户下拉菜单中的“同步进度”按钮触发，展示所有同步状态和历史记录。
+
+#### UI 过滤规则
+
+UI 层需要过滤掉墓碑数据（deleted=2），只显示：
+- 正常视图：deleted=0 的数据
+- 收纳箱视图：deleted=1 的数据
+
+任务列表只有两种状态：正常（deleted=0）和墓碑（deleted=2）。
+
 
 #### 界面设计
 ```javascript
@@ -1795,6 +1672,7 @@ async function migrateLocalDataToRemote(userId) {
     }
 
     // 4. 转换数据格式，添加用户ID
+    // 使用数据转换函数 - 完整实现见 [3.3 Supabase 数据层](#dataConverters)
     const supabaseTaskLists = localTaskLists.map(list => 
       convertIndexedDBToSupabase(list, userId)
     );
@@ -2090,6 +1968,11 @@ function generateId() {
    - 支持离线时间过长的数据合并
 
 ## 14. 四大原则的完整实现总结
+
+### 核心代码结构
+
+本文档的主要代码实现集中在 **3.2.4 UnifiedStorage** 和 **3.3 Supabase 数据层** 章节。
+其他章节引用这些核心实现，避免重复代码。
 
 ### 原则实现对照表
 
