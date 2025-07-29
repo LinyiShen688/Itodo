@@ -1,7 +1,7 @@
 # iTodo 混合存储实现任务清单
 
 ## 实现概览
-本文档基于 `code-design-plan.md` 和 `database-schema.md`，将混合存储功能实现划分为可独立开发、测试的模块。每个模块完成后需要进行 lint、测试、构建。
+本文档基于 `code-design-plan.md` 和 `database-schema.md`，将混合存储功能实现划分为可独立开发、测试的模块。每个模块完成后需要进行单元测试、lint、dev测试、构建。
 
 ## 模块划分与实现顺序
 
@@ -171,6 +171,19 @@
 - [ ] 准备回滚方案
 
 ## 开发规范
+### 开发技术
+● html
+● 样式设计：Tailwindcss、CSS、；
+  要实现响应式设计，采用 mobile-first（移动优先）策略；
+  使用Tailwindcss，只有必要时才用原生CSS。
+● UI组件库Shadcn UI，有合适组件直接使用Shadcn UI；
+● JS框架：Nextjs，使用app router架构；
+● 状态管理：Zustand，并将状态管理相关的配置都集中在一个store文件夹里。
+● 数据库：supabase
+● 编程思想：使用函数式编程；函数要高内聚、低耦合；
+
+### 测试文件
+测试文件放在根目录的test/目录下，统一管理（只有非常有必要的测试文件和配置文件才可以放在根目录下）
 
 ### 每个模块完成标准
 1. ✅ 代码实现完成
