@@ -8,7 +8,7 @@ import {
   updateTaskList,
   setActiveTaskList,
   deleteTaskList
-} from '@/lib/indexeddb';
+} from '@/lib/indexeddb-manager';
 
 export function useTaskLists() {
   const [taskLists, setTaskLists] = useState([]);

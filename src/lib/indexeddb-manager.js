@@ -394,3 +394,137 @@ export async function deleteTaskList(id) {
 
   await tx.done;
 }
+
+// === 新增单项查询函数 ===
+
+// 获取单个任务
+export async function getTask(id) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  return await db.get(STORES.TASKS, id);
+}
+
+// 获取单个任务列表
+export async function getTaskList(id) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  return await db.get(STORES.TASK_LISTS, id);
+}
+
+// === 新增直接插入函数（用于数据同步） ===
+
+// 直接插入任务（不生成新ID，使用传入的完整数据）
+export async function insertTask(taskData) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  
+  // 确保必要字段存在
+  const task = {
+    id: taskData.id,
+    text: taskData.text || "",
+    completed: taskData.completed || 0,
+    deleted: taskData.deleted || 0,
+    quadrant: taskData.quadrant || 1,
+    listId: taskData.listId || "today",
+    estimatedTime: taskData.estimatedTime || "",
+    order: taskData.order || 0,
+    createdAt: taskData.createdAt || new Date(),
+    updatedAt: taskData.updatedAt || new Date()
+  };
+  
+  await db.add(STORES.TASKS, task);
+  return task;
+}
+
+// 直接插入任务列表（不生成新ID，使用传入的完整数据）
+export async function insertTaskList(listData) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  
+  // 确保必要字段存在
+  const list = {
+    id: listData.id,
+    name: listData.name,
+    isActive: listData.isActive || 0,
+    deleted: listData.deleted || 0,
+    layoutMode: listData.layoutMode || "FOUR",
+    showETA: listData.showETA !== false ? 1 : 0,
+    createdAt: listData.createdAt || new Date(),
+    updatedAt: listData.updatedAt || new Date()
+  };
+  
+  await db.add(STORES.TASK_LISTS, list);
+  return list;
+}
+
+// === 移动任务相关函数 ===
+
+// 移动任务到指定位置
+export async function moveTask(taskId, fromQuadrant, toQuadrant, newOrder) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  const tx = db.transaction(STORES.TASKS, 'readwrite');
+  const store = tx.objectStore(STORES.TASKS);
+  
+  try {
+    // 获取要移动的任务
+    const task = await store.get(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+    
+    // 如果是同一象限内移动
+    if (fromQuadrant === toQuadrant) {
+      // 获取同象限内的所有任务
+      const allTasks = await store.index('listId').getAll(task.listId);
+      const quadrantTasks = allTasks
+        .filter(t => t.quadrant === toQuadrant && !t.deleted && t.id !== taskId)
+        .sort((a, b) => a.order - b.order);
+      
+      // 重新排序
+      let orderIndex = 0;
+      for (const t of quadrantTasks) {
+        if (orderIndex === newOrder) {
+          orderIndex++;
+        }
+        if (t.order !== orderIndex) {
+          t.order = orderIndex;
+          t.updatedAt = new Date();
+          await store.put(t);
+        }
+        orderIndex++;
+      }
+      
+      // 更新移动的任务
+      task.order = newOrder;
+      task.updatedAt = new Date();
+      await store.put(task);
+    } else {
+      // 跨象限移动
+      task.quadrant = toQuadrant;
+      task.order = newOrder;
+      task.updatedAt = new Date();
+      await store.put(task);
+      
+      // 重新排序目标象限的任务
+      const allTasks = await store.index('listId').getAll(task.listId);
+      const targetQuadrantTasks = allTasks
+        .filter(t => t.quadrant === toQuadrant && !t.deleted && t.id !== taskId)
+        .sort((a, b) => a.order - b.order);
+      
+      let orderIndex = 0;
+      for (const t of targetQuadrantTasks) {
+        if (orderIndex === newOrder) {
+          orderIndex++;
+        }
+        if (t.order !== orderIndex) {
+          t.order = orderIndex;
+          t.updatedAt = new Date();
+          await store.put(t);
+        }
+        orderIndex++;
+      }
+    }
+    
+    await tx.done;
+    return task;
+  } catch (error) {
+    console.error('Move task failed:', error);
+    throw error;
+  }
+}

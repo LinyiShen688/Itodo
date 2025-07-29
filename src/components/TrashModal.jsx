@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTrash } from '@/hooks/useTrash';
 import { useTaskListStore } from '@/stores/taskListStore';
 import { useTrashStore } from '@/stores/trashStore';
+import { useTaskStore } from '@/stores/taskStore';
 
 const QUADRANT_NAMES = {
   1: '重要且紧急',
@@ -16,6 +17,7 @@ export default function TrashModal({ isOpen, onClose }) {
   const { deletedTasks, loading, restoreTask, permanentDeleteTask, clearTrash, loadDeletedTasks } = useTrash();
   const { taskLists } = useTaskListStore();
   const { decrementDeletedCount, decrementDeletedCountBy, resetDeletedCount } = useTrashStore();
+  const { loadTasks, currentListId } = useTaskStore();
   const [selectedTasks, setSelectedTasks] = useState(new Set());
 
   // 当模态框打开时重新加载数据
@@ -66,6 +68,8 @@ export default function TrashModal({ isOpen, onClose }) {
       setSelectedTasks(new Set());
       // 更新计数
       decrementDeletedCountBy(count);
+      // 重新加载当前列表的任务，更新主页面显示
+      await loadTasks(currentListId);
     } catch (error) {
       console.error('Failed to restore selected tasks:', error);
       alert('恢复任务失败，请重试');
@@ -118,6 +122,8 @@ export default function TrashModal({ isOpen, onClose }) {
     try {
       await restoreTask(taskId);
       decrementDeletedCount();
+      // 重新加载当前列表的任务，更新主页面显示
+      await loadTasks(currentListId);
     } catch (error) {
       console.error('Failed to restore task:', error);
       alert('恢复任务失败，请重试');

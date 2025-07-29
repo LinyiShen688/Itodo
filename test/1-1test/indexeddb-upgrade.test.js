@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import 'fake-indexeddb/auto';
-import { initDB, generateId } from '../../src/lib/indexeddb.js';
+import { initDB, generateId } from '../../src/lib/indexeddb-manager.js';
+
+// Polyfill structuredClone for Node.js < 17
+if (!global.structuredClone) {
+  global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+}
 
 describe('IndexedDB Version 5 Upgrade', () => {
   let db;

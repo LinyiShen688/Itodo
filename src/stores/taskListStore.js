@@ -8,7 +8,7 @@ import {
   updateTaskList as dbUpdateTaskList,
   setActiveTaskList as dbSetActiveTaskList,
   deleteTaskList as dbDeleteTaskList
-} from '@/lib/indexeddb';
+} from '@/lib/indexeddb-manager';
 import { useTaskStore } from './taskStore';
 
 export const useTaskListStore = create((set, get) => ({

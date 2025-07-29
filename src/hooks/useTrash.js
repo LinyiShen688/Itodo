@@ -6,7 +6,7 @@ import {
   getDeletedTasks,
   restoreTask,
   permanentDeleteTask
-} from '@/lib/indexeddb';
+} from '@/lib/indexeddb-manager';
 
 export function useTrash(listId = null) {
   const [deletedTasks, setDeletedTasks] = useState([]);

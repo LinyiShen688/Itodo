@@ -9,7 +9,7 @@ import {
   deleteTask,
   moveTaskToQuadrant,
   reorderTasks
-} from '@/lib/indexeddb';
+} from '@/lib/indexeddb-manager';
 import { useTrashStore } from '@/stores/trashStore';
 
 export function useTasks(listId = 'today') {

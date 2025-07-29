@@ -244,20 +244,8 @@ pending    → processing → completed
 ##### IndexedDBManager - 本地存储管理
 ```javascript
 // src/lib/indexeddb-manager.js
-// 直接导出现有的IndexedDB函数，保持一致性
-export {
-  getAllTasks,
-  addTask,
-  updateTask,
-  deleteTask,
-  moveTask,
-  reorderTasks,
-  getAllTaskLists,
-  addTaskList,
-  updateTaskList,
-  deleteTaskList,
-  setActiveTaskList
-} from './indexeddb';
+// 封装所有 IndexedDB 操作，作为本地存储的唯一接口
+// 包含数据库初始化、任务和任务列表的所有 CRUD 操作
 ```
 
 ##### QueueManager - 队列管理

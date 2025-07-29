@@ -8,7 +8,7 @@ import {
   deleteTask as dbDeleteTask,
   moveTaskToQuadrant,
   reorderTasks as dbReorderTasks
-} from '@/lib/indexeddb';
+} from '@/lib/indexeddb-manager';
 import { useTrashStore } from './trashStore';
 import { toast } from '@/utils/toast';
 

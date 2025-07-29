@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { getAllDeletedTasks } from '@/lib/indexeddb';
+import { getAllDeletedTasks } from '@/lib/indexeddb-manager';
 
 export const useTrashStore = create((set, get) => ({
   deletedTaskCount: 0,
