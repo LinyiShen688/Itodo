@@ -860,12 +860,67 @@ export async function batchInsertTaskLists(taskLists, userId)
 export async function getUserDataExists(userId)  // 检查用户数据是否存在
 
 // 工具函数
-export function convertIndexedDBToSupabase(data, userId)
-export function convertSupabaseToIndexedDB(data)
+export function convertIndexedDBToSupabase(data, userId) {
+  // 任务转换
+  if (data.text !== undefined) {
+    return {
+      id: data.id,
+      user_id: userId,
+      text: data.text,
+      completed: data.completed === 1,  // 0/1 转 boolean
+      deleted: data.deleted || 0,       // 保持数值类型
+      quadrant: data.quadrant,
+      list_id: data.listId,             // 驼峰转下划线
+      estimated_time: data.estimatedTime,
+      order: data.order,
+      created_at: data.createdAt.toISOString(),
+      updated_at: data.updatedAt.toISOString()
+    };
+  }
+  
+  // 任务列表转换
+  return {
+    id: data.id,
+    user_id: userId,
+    name: data.name,
+    is_active: data.isActive === 1,    // 0/1 转 boolean
+    deleted: data.deleted || 0,         // 默认为0
+    layout_mode: data.layoutMode,       // 驼峰转下划线
+    show_eta: data.showETA,
+    created_at: data.createdAt.toISOString(),
+    updated_at: data.updatedAt.toISOString()
+  };
+}
 
-// 注意：转换函数需要处理task_lists的deleted字段
-// convertIndexedDBToSupabase: deleted默认为0
-// convertSupabaseToIndexedDB: 保留deleted字段值
+export function convertSupabaseToIndexedDB(data) {
+  // 任务转换
+  if (data.text !== undefined) {
+    return {
+      id: data.id,
+      text: data.text,
+      completed: data.completed ? 1 : 0,  // boolean 转 0/1
+      deleted: data.deleted,               // 保留原值 (0/1/2)
+      quadrant: data.quadrant,
+      listId: data.list_id,                // 下划线转驼峰
+      estimatedTime: data.estimated_time || '',
+      order: data.order,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at)
+    };
+  }
+  
+  // 任务列表转换
+  return {
+    id: data.id,
+    name: data.name,
+    isActive: data.is_active ? 1 : 0,     // boolean 转 0/1
+    deleted: data.deleted,                 // 保留原值 (0/2)
+    layoutMode: data.layout_mode || 'FOUR',
+    showETA: data.show_eta !== false,     // 默认true
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at)
+  };
+}
 
 // 应用层数据一致性验证实现
 export async function validateTaskListOwnership(listId, userId) {
@@ -1012,23 +1067,49 @@ function updateTaskWithTimestamp(taskData) {
 1. **Pull 阶段 - 获取云端更新**:
 ```javascript
 async function pullRemoteChanges(userId) {
-  const lastPullTime = localStorage.getItem(`last_pull_${userId}`) || '1970-01-01';
-  
-  // 使用 Supabase 查询增量数据
-  const { data: remoteTasks } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', userId)
-    .gt('updated_at', lastPullTime)  // 只获取更新的数据
-    .order('updated_at', { ascending: true });
+   const lastPullTime = localStorage.getItem(`last_pull_${userId}`) || '1970-01-01';
     
-  // 处理每一条远程数据
-  for (const remoteData of remoteTasks || []) {
-    await applyRemoteChange('task', remoteData);
-  }
-  
-  localStorage.setItem(`last_pull_${userId}`, new Date().toISOString());
+    try {
+      // 1. 获取云端更新的任务
+      const { data: remoteTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .gt('updated_at', lastPullTime)
+        .order('updated_at', { ascending: true });
+        
+      if (tasksError) throw tasksError;
+      
+      // 2. 获取云端更新的任务列表
+      const { data: remoteTaskLists, error: listsError } = await supabase
+        .from('task_lists')
+        .select('*')
+        .eq('user_id', userId)
+        .gt('updated_at', lastPullTime)
+        .order('updated_at', { ascending: true });
+        
+      if (listsError) throw listsError;
+      
+      // 3. 先处理任务列表（避免外键约束）
+      for (const remoteList of remoteTaskLists || []) {
+        await get().applyRemoteChange('taskList', remoteList);
+      }
+      
+      // 4. 再处理任务
+      for (const remoteTask of remoteTasks || []) {
+        await get().applyRemoteChange('task', remoteTask);
+      }
+      
+      // 5. 更新拉取时间
+      localStorage.setItem(`last_pull_${userId}`, new Date().toISOString());
+      
+    } catch (error) {
+      console.error('Pull remote changes failed:', error);
+      // 不阻止后续的队列处理
+    }
 }
+
+  
 ```
 
 2. **Conflict 阶段 - 冲突处理与队列清理**:
