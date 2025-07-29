@@ -299,7 +299,9 @@ export async function addToQueue(operation) {
     entityId: operation.entityId,
     changes: operation.changes,
     createdAt: new Date(),
-    retryCount: 0
+    completedAt: null,
+    retryCount: 0,
+    error: null
   };
   
   const db = await openDB('iTodoApp', 5);
@@ -318,8 +320,10 @@ export async function updateItemStatus(itemId, status, error = null) {
   const item = await db.get('syncQueue', itemId);
   if (item) {
     item.status = status;
-    if (error) item.error = error;
-    if (status === 'completed') item.completedAt = new Date();
+    item.error = error;
+    if (status === 'completed') {
+      item.completedAt = new Date();
+    }
     return await db.put('syncQueue', item);
   }
 }
@@ -1177,9 +1181,9 @@ interface QueueItem {
   entityId: string;         // 实体UUID
   data: object;             // 操作数据
   createdAt: Date;          // 创建时间
-  completedAt: Date;        // 完成时间
+  completedAt: Date | null; // 完成时间 (初始为 null)
   retryCount: number;       // 重试次数
-  error: string;            // 错误信息
+  error: string | null;     // 错误信息 (初始为 null)
 }
 ```
 
