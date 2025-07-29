@@ -46,7 +46,7 @@
 ├─────────────────────────────────────────────────────────┤
 │               Hook 层 (useTasks, useTaskLists)           │
 ├─────────────────────────────────────────────────────────┤
-│                   SimpleSyncQueue                        │
+│                   UnifiedStorage                         │
 │                    (统一调度层)                           │
 ├─────────────────────────────────────────────────────────┤
 │  IndexedDBManager  │  SyncManager  │   QueueManager      │
@@ -254,8 +254,8 @@ pending    → processing → completed
 - 管理网络状态监听
 - 处理数据格式转换
 
-##### 3.2.4 SimpleSyncQueue（协调层）
-**文件位置**: `src/lib/simple-sync-queue.js`
+##### 3.2.4 UnifiedStorage（协调层）
+**文件位置**: `src/lib/unified-storage.js`
 **职责**:
 - 协调三个模块的工作
 - 提供统一的对外接口
@@ -445,16 +445,16 @@ export function initNetworkListener() {
 }
 ```
 
-##### SimpleSyncQueue - 使用Zustand Store
+##### UnifiedStorage - 使用Zustand Store
 ```javascript
-// src/lib/simple-sync-queue.js
+// src/lib/unified-storage.js
 import { create } from 'zustand';
 import * as dbManager from './indexeddb-manager';
 import * as queueManager from './queue-manager';
 import * as syncManager from './sync-manager';
 import { checkMigrationNeeded, migrateLocalDataToSupabase } from './data-migration';
 
-export const useSyncQueue = create((set, get) => ({
+export const useUnifiedStorage = create((set, get) => ({
   // 初始化
   initialize: (authStore) => {
     // 监听认证状态变化
@@ -543,6 +543,70 @@ export const useSyncQueue = create((set, get) => ({
     }
     
     return deletedTask;
+  },
+
+  // 任务列表操作
+  addTaskList: async (name, layoutMode, showETA, authStore) => {
+    // 1. 立即创建本地任务列表
+    const localList = await dbManager.addTaskList(name, layoutMode, showETA);
+    
+    // 2. 如果已登录，加入同步队列
+    if (authStore.isAuthenticated()) {
+      await queueManager.addToQueue({
+        action: 'add',
+        entityType: 'taskList',
+        entityId: localList.id,
+        changes: localList
+      });
+      
+      get().processQueue(authStore);
+    }
+    
+    return localList;
+  },
+
+  updateTaskList: async (id, updates, authStore) => {
+    // 1. 立即更新本地
+    const updatedList = await dbManager.updateTaskList(id, updates);
+    
+    // 2. 如果已登录，加入同步队列
+    if (authStore.isAuthenticated()) {
+      await queueManager.addToQueue({
+        action: 'update',
+        entityType: 'taskList',
+        entityId: id,
+        changes: updates
+      });
+      
+      get().processQueue(authStore);
+    }
+    
+    return updatedList;
+  },
+
+  setActiveTaskList: async (id, authStore) => {
+    // 1. 立即更新本地
+    const activeList = await dbManager.setActiveTaskList(id);
+    
+    // 2. 如果已登录，需要同步所有列表的激活状态
+    if (authStore.isAuthenticated()) {
+      // 获取所有任务列表
+      const allLists = await dbManager.getAllTaskLists();
+      
+      // 为每个列表创建同步项
+      for (const list of allLists) {
+        await queueManager.addToQueue({
+          action: 'update',
+          entityType: 'taskList',
+          entityId: list.id,
+          changes: { isActive: list.id === id ? 1 : 0 }
+        });
+      }
+      
+      get().processQueue(authStore);
+    }
+    
+    return activeList;
   },
 
   deleteTaskList: async (listId, authStore) => {
@@ -1377,18 +1441,18 @@ const SyncProgressModal = ({ isOpen, onClose }) => {
   }, [isOpen]);
   
   const loadSyncStatus = async () => {
-    const status = await simpleSyncQueue.getSyncStatus();
+    const status = await unifiedStorage.getSyncStatus();
     setSyncStatus(status);
     setLoading(false);
   };
   
   const handleRetry = async (itemId) => {
-    await simpleSyncQueue.retryFailedItem(itemId);
+    await unifiedStorage.retryFailedItem(itemId);
     await loadSyncStatus(); // 刷新状态
   };
   
   const handleDelete = async (itemId) => {
-    await simpleSyncQueue.deleteQueueItem(itemId);
+    await unifiedStorage.deleteQueueItem(itemId);
     await loadSyncStatus(); // 刷新状态
   };
   
@@ -1586,28 +1650,28 @@ const SyncStatusBar = () => {
 import { getAllTasks, addTask, updateTask, ... } from '@/lib/indexeddb';
 
 // 新的导入
-import { useSyncQueue } from '@/lib/simple-sync-queue';
+import { useUnifiedStorage } from '@/lib/unified-storage';
 import { useAuthStore } from '@/stores/authStore';
 
 export function useTasks(listId = 'today') {
   const authStore = useAuthStore();
-  const syncQueue = useSyncQueue();
+  const unifiedStorage = useUnifiedStorage();
   
   // 初始化同步队列（只在首次渲染时执行）
   useEffect(() => {
-    syncQueue.initialize(authStore);
+    unifiedStorage.initialize(authStore);
   }, []);
   
-  // 其他逻辑保持不变，但调用 syncQueue 的方法
+  // 其他逻辑保持不变，但调用 unifiedStorage 的方法
   const handleAddTask = useCallback(async (quadrant, text = '') => {
-    const newTask = await syncQueue.addTask({
+    const newTask = await unifiedStorage.addTask({
       text,
       quadrant,
       listId,
       order: existingTasks.length
     }, authStore);
     // ... 更新本地状态
-  }, [syncQueue, listId, authStore]);
+  }, [unifiedStorage, listId, authStore]);
 }
 ```
 
@@ -1617,18 +1681,18 @@ export function useTasks(listId = 'today') {
 ```javascript
 export function useTaskLists() {
   const authStore = useAuthStore();
-  const syncQueue = useSyncQueue();
+  const unifiedStorage = useUnifiedStorage();
   
   // 初始化（与useTasks共享同一个store实例）
   useEffect(() => {
-    syncQueue.initialize(authStore);
+    unifiedStorage.initialize(authStore);
   }, []);
   
   // 加载任务列表
   const loadTaskLists = useCallback(async () => {
-    const lists = await syncQueue.getTaskLists();
+    const lists = await unifiedStorage.getTaskLists();
     setTaskLists(lists);
-  }, [syncQueue]);
+  }, [unifiedStorage]);
   
   // 其他方法类似改造...
 }
@@ -1695,7 +1759,7 @@ async function migrateLocalDataToRemote(userId) {
 
 ### 6.1 网络异常处理
 ```javascript
-// SimpleSyncQueue 已经内置了网络异常处理
+// UnifiedStorage 已经内置了网络异常处理
 // 1. 所有操作首先写入本地，确保离线可用
 // 2. 网络异常时，操作自动进入同步队列
 // 3. 网络恢复后，自动处理队列中的操作
@@ -1703,12 +1767,12 @@ async function migrateLocalDataToRemote(userId) {
 // 示例：网络状态监听
 window.addEventListener('online', () => {
   console.log('网络已恢复，开始处理同步队列...');
-  syncQueue.processQueue();
+  unifiedStorage.processQueue();
 });
 
 window.addEventListener('offline', () => {
   console.log('网络已断开，切换到离线模式');
-  // SimpleSyncQueue 会自动处理，无需额外操作
+  // UnifiedStorage 会自动处理，无需额外操作
 });
 ```
 
@@ -1756,8 +1820,8 @@ export const useSyncStore = create((set, get) => ({
 
 ### 7.2 认证状态监听
 ```javascript
-// 在 SimpleSyncQueue 的 Zustand store 中监听认证状态变化
-// 这段代码已经在上面的 SimpleSyncQueue 实现中包含了
+// 在 UnifiedStorage 的 Zustand store 中监听认证状态变化
+// 这段代码已经在上面的 UnifiedStorage 实现中包含了
 // 监听登录状态变化通过 initialize 方法设置：
 
 // initialize: (authStore) => {
@@ -1804,7 +1868,7 @@ async function batchUpdate(operations) {
 ## 9. 测试策略
 
 ### 9.1 单元测试
-- SimpleSyncQueue 核心逻辑测试
+- UnifiedStorage 核心逻辑测试
 - 数据转换函数测试
 - 同步机制测试
 
@@ -1841,7 +1905,7 @@ BATCH_SIZE=50
 ## 11. 实施时间表
 
 ### 阶段1: 基础架构 (1-2周)
-- 创建 StorageManager 和 Supabase 数据层
+- 创建 UnifiedStorage 统一存储架构和 Supabase 数据层
 - 实现基本的双写逻辑
 - 基础测试覆盖
 
@@ -1872,8 +1936,8 @@ BATCH_SIZE=50
 
 ### 12.2 关键安全点
 ```javascript
-// 1. SimpleSyncQueue 自动处理用户ID
-// 在 SimpleSyncQueue 中，所有操作都会根据认证状态自动处理
+// 1. UnifiedStorage 自动处理用户ID
+// 在 UnifiedStorage 中，所有操作都会根据认证状态自动处理
 
 // 未登录用户：
 // - 所有操作仅写入 IndexedDB
@@ -1886,7 +1950,7 @@ BATCH_SIZE=50
 // - 后台同步时自动添加 user_id
 
 // 示例：任务添加时的用户ID处理
-// 在 SimpleSyncQueue 的 processSyncItem 方法中
+// 在 UnifiedStorage 的 processSyncItem 方法中
 // 获取当前用户ID并添加到数据中
 processSyncItem: async (item) => {
   const authStore = useAuthStore.getState();
