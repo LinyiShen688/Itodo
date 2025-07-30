@@ -45,7 +45,9 @@ export async function batchAddToQueue(operations) {
   const store = tx.objectStore(SYNC_QUEUE_STORE);
   
   const queueItems = [];
+  const addPromises = [];
   
+  // 创建所有队列项并收集 promises
   for (const operation of operations) {
     const queueItem = {
       id: generateId(),
@@ -60,11 +62,17 @@ export async function batchAddToQueue(operations) {
       error: null
     };
     
-    await store.add(queueItem);
+    // 收集每个 add 操作的 promise
+    addPromises.push(store.add(queueItem));
     queueItems.push(queueItem);
   }
   
+  // 并行执行所有 add 操作
+  await Promise.all(addPromises);
+  
+  // 等待事务完成
   await tx.done;
+  
   return queueItems;
 }
 

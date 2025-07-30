@@ -714,15 +714,16 @@ export const useUnifiedStorage = create((set, get) => ({
         return;
       }
       
-      // 批量更新 userId
+      // 批量更新 userId（并行执行）
       const taskListIds = nullUserIdTaskLists.map(list => list.id);
       const taskIds = nullUserIdTasks.map(task => task.id);
       
-      await updateTaskListsUserId(taskListIds, userId);
-      await updateTasksUserId(taskIds, userId);
+      await Promise.all([
+        updateTaskListsUserId(taskListIds, userId),
+        updateTasksUserId(taskIds, userId)
+      ]);
       
-      // 数据量大时批量加入同步队列
-      if (nullUserIdTaskLists.length + nullUserIdTasks.length > 100) {
+
         // 批量创建队列项
         const queueItems = [];
         
@@ -748,26 +749,6 @@ export const useUnifiedStorage = create((set, get) => ({
         }
         
         await queueManager.batchAddToQueue(queueItems);
-      } else {
-        // 数据量小时逐个加入
-        for (const list of nullUserIdTaskLists) {
-          await queueManager.addToQueue({
-            action: 'add',
-            entityType: 'taskList',
-            entityId: list.id,
-            changes: { ...list, userId }
-          });
-        }
-        
-        for (const task of nullUserIdTasks) {
-          await queueManager.addToQueue({
-            action: 'add',
-            entityType: 'task',
-            entityId: task.id,
-            changes: { ...task, userId }
-          });
-        }
-      }
       
       console.log('本地数据已加入同步队列');
     } catch (error) {

@@ -611,14 +611,17 @@ export async function updateTasksUserId(taskIds, userId) {
   const store = tx.objectStore(STORES.TASKS);
   
   try {
-    for (const taskId of taskIds) {
+    const updatePromises = taskIds.map(async (taskId) => {
       const task = await store.get(taskId);
       if (task) {
         task.userId = userId;
         task.updatedAt = new Date();
-        await store.put(task);
+        return store.put(task);
       }
-    }
+    });
+    
+    // 并行执行所有更新
+    await Promise.all(updatePromises);
     await tx.done;
   } catch (error) {
     console.error('Update tasks userId failed:', error);
@@ -633,14 +636,17 @@ export async function updateTaskListsUserId(listIds, userId) {
   const store = tx.objectStore(STORES.TASK_LISTS);
   
   try {
-    for (const listId of listIds) {
+    const updatePromises = listIds.map(async (listId) => {
       const list = await store.get(listId);
       if (list) {
         list.userId = userId;
         list.updatedAt = new Date();
-        await store.put(list);
+        return store.put(list);
       }
-    }
+    });
+    
+    // 并行执行所有更新
+    await Promise.all(updatePromises);
     await tx.done;
   } catch (error) {
     console.error('Update task lists userId failed:', error);
