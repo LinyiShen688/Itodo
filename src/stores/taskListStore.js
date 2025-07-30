@@ -168,5 +168,28 @@ export const useTaskListStore = create((set, get) => ({
   // 初始化
   initialize: async () => {
     await get().loadTaskLists();
+    
+    // 检查是否有任务列表，如果没有则创建默认列表
+    const state = get();
+    if (state.taskLists.length === 0) {
+      try {
+        // 创建默认任务列表
+        const defaultList = await dbAddTaskList('今天要做的事', 'FOUR', true, null);
+        
+        // 设置为活动列表
+        const activeList = await dbSetActiveTaskList(defaultList.id);
+        
+        set(state => ({
+          taskLists: [defaultList],
+          activeList: activeList
+        }));
+        
+        // 加载该列表的任务（虽然是空的）
+        useTaskStore.getState().loadTasks(defaultList.id);
+      } catch (err) {
+        console.error('Failed to create default task list:', err);
+        set({ error: err.message });
+      }
+    }
   }
 }));
