@@ -95,14 +95,6 @@
 - **测试要点**: API 调用正确性、错误处理、数据验证
 - **文件**: `src/lib/supabase-db.js`
 
-#### 3.2 数据处理模块（userId 标记方案）
-- [ ] 不再需要独立的 data-migration.js 文件
-- [ ] 在 UnifiedStorage 中实现 `processNullUserIdData()` 函数
-- [ ] 使用 IndexedDBManager 的 userId 查询和更新函数
-- [ ] 批量将 userId=null 的数据加入同步队列
-- [ ] 通过现有的 pull-apply-push 机制完成同步
-- **测试要点**: userId 更新正确性、队列批量添加、数据完整性
-- **说明**: 新方案直接集成在 UnifiedStorage 中，无需独立模块
 
 ### 阶段 4: UnifiedStorage 统一层
 
