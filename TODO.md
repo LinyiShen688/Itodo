@@ -43,14 +43,14 @@
 - **文件**: `src/lib/indexeddb-manager.js`
 
 #### 2.2 QueueManager 模块
-- [ ] 创建 `src/lib/queue-manager.js`
-- [ ] 实现 `addToQueue()` 函数
-- [ ] 实现 `getPendingItems()` 函数
-- [ ] 实现 `updateItemStatus()` 函数
-- [ ] 实现 `updateItem()` 函数
-- [ ] 实现 `getSyncStatus()` 函数
-- [ ] 实现 `deleteQueueItem()` 函数
-- [ ] 创建队列管理单元测试
+- [x] 创建 `src/lib/queue-manager.js`
+- [x] 实现 `addToQueue()` 函数
+- [x] 实现 `getPendingItems()` 函数
+- [x] 实现 `updateItemStatus()` 函数
+- [x] 实现 `updateItem()` 函数
+- [x] 实现 `getSyncStatus()` 函数
+- [x]实现 `deleteQueueItem()` 函数
+- [x] 创建队列管理单元测试
 - **测试要点**: 队列状态转换、并发操作安全性
 - **文件**: `src/lib/queue-manager.js`
 

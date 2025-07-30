@@ -3,7 +3,7 @@ import { openDB } from 'idb';
 import { generateId } from './indexeddb-manager';
 
 const DB_NAME = 'iTodoApp';
-const DB_VERSION = 5;
+const DB_VERSION = 1;
 const SYNC_QUEUE_STORE = 'syncQueue';
 
 /**

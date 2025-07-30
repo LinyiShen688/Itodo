@@ -46,7 +46,7 @@ describe('IndexedDBManager', () => {
   describe('Database initialization', () => {
     it('should initialize database with correct version', async () => {
       const db = await dbManager.initDB();
-      expect(db.version).toBe(5);
+      expect(db.version).toBe(1);
       expect(db.objectStoreNames).toContain('tasks');
       expect(db.objectStoreNames).toContain('taskLists');
       expect(db.objectStoreNames).toContain('syncQueue');
@@ -200,7 +200,7 @@ describe('IndexedDBManager', () => {
           isActive: 1,
           deleted: 0,
           layoutMode: 'FOUR',
-          showETA: 1,
+          showETA: true,
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-02')
         };
@@ -209,7 +209,7 @@ describe('IndexedDBManager', () => {
         expect(insertedList.id).toBe('custom-list-id');
         expect(insertedList.name).toBe('Custom List');
         expect(insertedList.isActive).toBe(1);
-        expect(insertedList.showETA).toBe(1);
+        expect(insertedList.showETA).toBe(true);
 
         // Verify it was actually inserted
         const retrievedList = await dbManager.getTaskList('custom-list-id');
@@ -229,7 +229,7 @@ describe('IndexedDBManager', () => {
         expect(insertedList.isActive).toBe(0);
         expect(insertedList.deleted).toBe(0);
         expect(insertedList.layoutMode).toBe('FOUR');
-        expect(insertedList.showETA).toBe(1);
+        expect(insertedList.showETA).toBe(true);
         expect(insertedList.createdAt).toBeInstanceOf(Date);
         expect(insertedList.updatedAt).toBeInstanceOf(Date);
       });
@@ -242,7 +242,7 @@ describe('IndexedDBManager', () => {
         };
 
         const insertedList = await dbManager.insertTaskList(listData);
-        expect(insertedList.showETA).toBe(0);
+        expect(insertedList.showETA).toBe(false);
       });
     });
   });

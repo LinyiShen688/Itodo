@@ -5,7 +5,7 @@
 ### 数据库信息
 
 - **数据库名**: iTodoApp
-- **版本**: 5 (从版本 4 升级，新增同步队列)
+- **版本**: 1 (初始版本，包含所有功能)
 - **存储空间**: tasks, taskLists, syncQueue
 
 ### Tasks 表结构 (IndexedDB)
@@ -21,7 +21,8 @@
   estimatedTime: string,   // 预计完成时间 (如: "2小时", "30分钟")
   order: number,           // 同象限内排序号 (0, 1, 2...)
   createdAt: Date,         // 创建时间
-  updatedAt: Date          // 更新时间
+  updatedAt: Date,         // 更新时间
+  userId: string|null      // 用户ID (登录后为用户ID，未登录为null)
 }
 ```
 
@@ -36,8 +37,8 @@
   layoutMode: string,      // 布局模式 (目前固定为 "FOUR")
   showETA: boolean,        // 是否显示预计时间 (true/false)
   createdAt: Date,         // 创建时间
-  updatedAt: Date          // 更新时间
-  // 注意：IndexedDB 版本没有 user_id，因为是本地存储，天然按用户隔离
+  updatedAt: Date,         // 更新时间
+  userId: string|null      // 用户ID (登录后为用户ID，未登录为null)
 }
 ```
 
@@ -64,24 +65,24 @@
 
 ```javascript
 // Tasks 表索引
--"quadrant"(象限索引) -
-  "listId"(任务列表ID索引) -
-  "completed"(完成状态索引) -
-  "deleted"(删除状态索引) -
-  "createdAt"(创建时间索引) -
-  // TaskLists 表索引
-  "isActive"(激活状态索引) -
-  "deleted"(删除状态索引) -
-  "createdAt"(创建时间索引) -
-  // SyncQueue 表索引 ← 新增
-  "status"(同步状态索引) -
-  用于查询待处理 / 失败的项 -
-  "createdAt"(创建时间索引) -
-  用于按时间排序 -
-  "entityType"(实体类型索引) -
-  用于按类型过滤 -
-  "action"(操作类型索引) -
-  用于按操作过滤;
+- "quadrant" (象限索引)
+- "listId" (任务列表ID索引)
+- "completed" (完成状态索引)
+- "deleted" (删除状态索引)
+- "createdAt" (创建时间索引)
+- "userId" (用户ID索引)
+
+// TaskLists 表索引
+- "isActive" (激活状态索引)
+- "deleted" (删除状态索引)
+- "createdAt" (创建时间索引)
+- "userId" (用户ID索引)
+
+// SyncQueue 表索引 ← 新增
+- "status" (同步状态索引) - 用于查询待处理/失败的项
+- "createdAt" (创建时间索引) - 用于按时间排序
+- "entityType" (实体类型索引) - 用于按类型过滤
+- "action" (操作类型索引) - 用于按操作过滤
 ```
 
 ## 2. Supabase 数据库设计

@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "iTodoApp";
-const DB_VERSION = 6;
+const DB_VERSION = 1;
 
 const STORES = {
   TASKS: "tasks",
@@ -13,160 +13,42 @@ const STORES = {
 export async function initDB() {
   const db = await openDB(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, newVersion, transaction) {
-      // 任务存储
+      // 任务存储 - 一次性创建完整结构
       if (!db.objectStoreNames.contains(STORES.TASKS)) {
         const taskStore = db.createObjectStore(STORES.TASKS, {
           keyPath: "id",
         });
+        // 创建所有索引
         taskStore.createIndex("quadrant", "quadrant");
         taskStore.createIndex("listId", "listId");
         taskStore.createIndex("completed", "completed");
         taskStore.createIndex("deleted", "deleted");
         taskStore.createIndex("createdAt", "createdAt");
+        taskStore.createIndex("userId", "userId");
       }
 
-      // 任务列表存储
+      // 任务列表存储 - 一次性创建完整结构
       if (!db.objectStoreNames.contains(STORES.TASK_LISTS)) {
         const listStore = db.createObjectStore(STORES.TASK_LISTS, {
           keyPath: "id",
         });
+        // 创建所有索引
         listStore.createIndex("isActive", "isActive");
         listStore.createIndex("deleted", "deleted");
         listStore.createIndex("createdAt", "createdAt");
+        listStore.createIndex("userId", "userId");
       }
 
-      // 版本升级处理
-      if (oldVersion < 2 && db.objectStoreNames.contains(STORES.TASKS)) {
-        // 为现有任务添加 estimatedTime 字段
-        const taskStore = transaction.objectStore(STORES.TASKS);
-
-        // 使用cursor遍历所有任务
-        const request = taskStore.openCursor();
-        request.onsuccess = (event) => {
-          const cursor = event.target.result;
-          if (cursor) {
-            const task = cursor.value;
-            if (!task.hasOwnProperty("estimatedTime")) {
-              task.estimatedTime = "";
-              cursor.update(task);
-            }
-            cursor.continue();
-          }
-        };
-      }
-
-      // 版本3升级：添加deleted字段和索引
-      if (oldVersion < 3 && db.objectStoreNames.contains(STORES.TASKS)) {
-        const taskStore = transaction.objectStore(STORES.TASKS);
-
-        // 添加deleted索引（如果不存在）
-        if (!taskStore.indexNames.contains("deleted")) {
-          taskStore.createIndex("deleted", "deleted");
-        }
-
-        // 为现有任务添加 deleted 字段
-        const request = taskStore.openCursor();
-        request.onsuccess = (event) => {
-          const cursor = event.target.result;
-          if (cursor) {
-            const task = cursor.value;
-            if (!task.hasOwnProperty("deleted")) {
-              task.deleted = 0; // 0表示未删除，1表示已删除
-              cursor.update(task);
-            }
-            cursor.continue();
-          }
-        };
-      }
-
-      // 版本4升级：为任务列表添加deleted字段
-      if (oldVersion < 4 && db.objectStoreNames.contains(STORES.TASK_LISTS)) {
-        const listStore = transaction.objectStore(STORES.TASK_LISTS);
-
-        // 添加deleted索引
-        if (!listStore.indexNames.contains("deleted")) {
-          listStore.createIndex("deleted", "deleted");
-        }
-
-        // 为现有任务列表添加 deleted 字段
-        const request = listStore.openCursor();
-        request.onsuccess = (event) => {
-          const cursor = event.target.result;
-          if (cursor) {
-            const list = cursor.value;
-            if (!list.hasOwnProperty("deleted")) {
-              list.deleted = 0; // 0表示正常，2表示墓碑
-              cursor.update(list);
-            }
-            cursor.continue();
-          }
-        };
-      }
-
-      // 版本5升级：添加同步队列存储
-      if (oldVersion < 5) {
-        // 创建同步队列存储
-        if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
-          const queueStore = db.createObjectStore(STORES.SYNC_QUEUE, {
-            keyPath: "id",
-          });
-          // 创建索引
-          queueStore.createIndex("status", "status");
-          queueStore.createIndex("createdAt", "createdAt");
-          queueStore.createIndex("entityType", "entityType");
-          queueStore.createIndex("action", "action");
-        }
-      }
-
-      // 版本6升级：为任务和任务列表添加userId字段
-      if (oldVersion < 6) {
-        // 为任务添加userId字段和索引
-        if (db.objectStoreNames.contains(STORES.TASKS)) {
-          const taskStore = transaction.objectStore(STORES.TASKS);
-          
-          // 添加userId索引
-          if (!taskStore.indexNames.contains("userId")) {
-            taskStore.createIndex("userId", "userId");
-          }
-          
-          // 为现有任务添加 userId 字段（默认为null）
-          const taskRequest = taskStore.openCursor();
-          taskRequest.onsuccess = (event) => {
-            const cursor = event.target.result;
-            if (cursor) {
-              const task = cursor.value;
-              if (!task.hasOwnProperty("userId")) {
-                task.userId = null;
-                cursor.update(task);
-              }
-              cursor.continue();
-            }
-          };
-        }
-
-        // 为任务列表添加userId字段和索引
-        if (db.objectStoreNames.contains(STORES.TASK_LISTS)) {
-          const listStore = transaction.objectStore(STORES.TASK_LISTS);
-          
-          // 添加userId索引
-          if (!listStore.indexNames.contains("userId")) {
-            listStore.createIndex("userId", "userId");
-          }
-          
-          // 为现有任务列表添加 userId 字段（默认为null）
-          const listRequest = listStore.openCursor();
-          listRequest.onsuccess = (event) => {
-            const cursor = event.target.result;
-            if (cursor) {
-              const list = cursor.value;
-              if (!list.hasOwnProperty("userId")) {
-                list.userId = null;
-                cursor.update(list);
-              }
-              cursor.continue();
-            }
-          };
-        }
+      // 同步队列存储 - 一次性创建完整结构
+      if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
+        const queueStore = db.createObjectStore(STORES.SYNC_QUEUE, {
+          keyPath: "id",
+        });
+        // 创建所有索引
+        queueStore.createIndex("status", "status");
+        queueStore.createIndex("createdAt", "createdAt");
+        queueStore.createIndex("entityType", "entityType");
+        queueStore.createIndex("action", "action");
       }
     },
   });
@@ -498,7 +380,7 @@ export async function insertTaskList(listData) {
     isActive: listData.isActive || 0,
     deleted: listData.deleted || 0,
     layoutMode: listData.layoutMode || "FOUR",
-    showETA: listData.showETA !== false ? 1 : 0,
+    showETA: listData.showETA !== false,
     userId: listData.userId || null, // 添加 userId 字段
     createdAt: listData.createdAt || new Date(),
     updatedAt: listData.updatedAt || new Date()
