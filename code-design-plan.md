@@ -452,10 +452,14 @@ export const useUnifiedStorage = create((set, get) => ({
   },
 
   addTask: async (taskData, authStore) => {
-    // 1. 立即写入本地
-    const localTask = await dbManager.addTask(taskData);
+    // 1. 设置 userId（已登录时设置用户ID，未登录时为null）
+    const userId = authStore.isAuthenticated() ? authStore.user?.id : null;
+    const taskWithUserId = { ...taskData, userId };
     
-    // 2. 如果已登录，加入同步队列
+    // 2. 立即写入本地
+    const localTask = await dbManager.addTask(taskWithUserId);
+    
+    // 3. 如果已登录，加入同步队列
     if (authStore.isAuthenticated()) {
       await queueManager.addToQueue({
         action: 'add',
@@ -464,7 +468,7 @@ export const useUnifiedStorage = create((set, get) => ({
         changes: localTask
       });
       
-      // 3. 立即尝试同步
+      // 4. 立即尝试同步
       get().processQueue(authStore);
     }
     
@@ -512,10 +516,13 @@ export const useUnifiedStorage = create((set, get) => ({
 
   // 任务列表操作
   addTaskList: async (name, layoutMode, showETA, authStore) => {
-    // 1. 立即创建本地任务列表
-    const localList = await dbManager.addTaskList(name, layoutMode, showETA);
+    // 1. 设置 userId（已登录时设置用户ID，未登录时为null）
+    const userId = authStore.isAuthenticated() ? authStore.user?.id : null;
     
-    // 2. 如果已登录，加入同步队列
+    // 2. 立即创建本地任务列表（在 dbManager 中设置 userId）
+    const localList = await dbManager.addTaskList(name, layoutMode, showETA, userId);
+    
+    // 3. 如果已登录，加入同步队列
     if (authStore.isAuthenticated()) {
       await queueManager.addToQueue({
         action: 'add',
@@ -676,21 +683,97 @@ export const useUnifiedStorage = create((set, get) => ({
 
   // 用户登录处理
   onUserLogin: async (user) => {
-    // 检查是否需要数据迁移
-    const needsMigration = await checkMigrationNeeded(user.id);
-    if (needsMigration) {
-      await migrateLocalDataToSupabase(user.id);
-    }
+    // 1. 处理 userId 为 null 的本地数据
+    await get().processNullUserIdData(user.id);
     
-    // 1. 拉取远程数据
+    // 2. 拉取远程数据
     const remoteData = await get().pullRemoteData(user.id);
     
-    // 2. 应用远程数据到本地
+    // 3. 应用远程数据到本地
     await get().applyRemoteData(remoteData);
     
-    // 3. 处理同步队列，推送本地数据到远程
+    // 4. 处理同步队列，推送本地数据到远程
     const authStore = useAuthStore.getState();
     await get().processQueue(authStore);
+  },
+
+  // 处理 userId 为 null 的数据
+  processNullUserIdData: async (userId) => {
+    try {
+      // 导入需要的函数
+      const { getNullUserIdTaskLists, getNullUserIdTasks, updateTaskListsUserId, updateTasksUserId } = 
+        await import('./indexeddb-manager');
+      
+      // 获取所有 userId 为 null 的数据
+      const nullUserIdTaskLists = await getNullUserIdTaskLists();
+      const nullUserIdTasks = await getNullUserIdTasks();
+      
+      console.log(`发现 ${nullUserIdTaskLists.length} 个未同步的任务列表，${nullUserIdTasks.length} 个未同步的任务`);
+      
+      if (nullUserIdTaskLists.length === 0 && nullUserIdTasks.length === 0) {
+        return;
+      }
+      
+      // 批量更新 userId
+      const taskListIds = nullUserIdTaskLists.map(list => list.id);
+      const taskIds = nullUserIdTasks.map(task => task.id);
+      
+      await updateTaskListsUserId(taskListIds, userId);
+      await updateTasksUserId(taskIds, userId);
+      
+      // 数据量大时批量加入同步队列
+      if (nullUserIdTaskLists.length + nullUserIdTasks.length > 100) {
+        // 批量创建队列项
+        const queueItems = [];
+        
+        // 注意：插入同步队列的时候先插入任务列表的再插入任务，免得任务表的外键找不到。
+        // 任务列表队列项
+        for (const list of nullUserIdTaskLists) {
+          queueItems.push({
+            action: 'add',
+            entityType: 'taskList',
+            entityId: list.id,
+            changes: { ...list, userId }
+          });
+        }
+        
+        // 任务队列项
+        for (const task of nullUserIdTasks) {
+          queueItems.push({
+            action: 'add',
+            entityType: 'task',
+            entityId: task.id,
+            changes: { ...task, userId }
+          });
+        }
+        
+        await queueManager.batchAddToQueue(queueItems);
+      } else {
+        // 数据量小时逐个加入
+        for (const list of nullUserIdTaskLists) {
+          await queueManager.addToQueue({
+            action: 'add',
+            entityType: 'taskList',
+            entityId: list.id,
+            changes: { ...list, userId }
+          });
+        }
+        
+        for (const task of nullUserIdTasks) {
+          await queueManager.addToQueue({
+            action: 'add',
+            entityType: 'task',
+            entityId: task.id,
+            changes: { ...task, userId }
+          });
+        }
+      }
+      
+      console.log('本地数据已加入同步队列');
+    } catch (error) {
+      console.error('处理本地数据失败:', error);
+      // 不抛出错误，避免阻塞登录流程
+    }
   },
   
   // <a id="pullRemoteData"></a>
@@ -1627,63 +1710,22 @@ export function useTaskLists() {
 }
 ```
 
-### 4.2 数据迁移实现
+### 4.2 数据迁移实现（已废弃，改用 userId 标记方案）
 
-#### 迁移触发时机
-- 用户首次登录成功后
-- 检测到本地有数据但云端为空时
-- 用户主动触发同步时
+本节内容已被新的实现方案替代。新方案说明：
 
-#### 迁移流程
-```javascript
-async function migrateLocalDataToRemote(userId) {
-  try {
-    // 1. 检查是否已经迁移过
-    const migrationKey = `migration_completed_${userId}`;
-    if (localStorage.getItem(migrationKey) === 'true') {
-      return { success: true, message: '数据已经迁移过' };
-    }
+#### 新方案核心思路
+1. 为 IndexedDB 的 tasks 和 taskLists 表添加 userId 字段
+2. 未登录时创建的数据，userId 为 null
+3. 用户登录时，查找所有 userId=null 的数据，更新其 userId 并加入同步队列
+4. 通过现有的 pull-apply-push 机制完成同步
 
-    // 2. 检查云端是否已有数据
-    const hasRemoteData = await getUserDataExists(userId);
-    if (hasRemoteData) {
-      localStorage.setItem(migrationKey, 'true');
-      return { success: true, message: '云端已有数据，跳过迁移' };
-    }
+#### 优势
+- 实现简单，复用现有同步机制
+- 自然处理退出登录后创建数据的场景
+- 无需维护复杂的迁移状态
 
-    // 3. 获取本地所有数据
-    const localTaskLists = await getAllTaskLists();
-    const localTasks = await getAllTasks();
 
-    if (localTaskLists.length === 0 && localTasks.length === 0) {
-      // 本地无数据，直接标记迁移完成
-      localStorage.setItem(migrationKey, 'true');
-      return { success: true, message: '本地无数据，无需迁移' };
-    }
-
-    // 4. 转换数据格式，添加用户ID
-    // 使用数据转换函数 - 完整实现见 [3.3 Supabase 数据层](#dataConverters)
-    const supabaseTaskLists = localTaskLists.map(list => 
-      convertIndexedDBToSupabase(list, userId)
-    );
-    const supabaseTasks = localTasks.map(task => 
-      convertIndexedDBToSupabase(task, userId)
-    );
-
-    // 5. 批量插入到 Supabase
-    await batchInsertTaskLists(supabaseTaskLists, userId);
-    await batchInsertTasks(supabaseTasks, userId);
-
-    // 6. 标记迁移完成
-    localStorage.setItem(migrationKey, 'true');
-    
-    return { success: true, message: '数据迁移完成' };
-  } catch (error) {
-    console.error('数据迁移失败:', error);
-    return { success: false, error: error.message };
-  }
-}
-```
 
 ### 4.3 错误处理和容错机制
 

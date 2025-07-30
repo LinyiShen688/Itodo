@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "iTodoApp";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 const STORES = {
   TASKS: "tasks",
@@ -117,6 +117,57 @@ export async function initDB() {
           queueStore.createIndex("action", "action");
         }
       }
+
+      // 版本6升级：为任务和任务列表添加userId字段
+      if (oldVersion < 6) {
+        // 为任务添加userId字段和索引
+        if (db.objectStoreNames.contains(STORES.TASKS)) {
+          const taskStore = transaction.objectStore(STORES.TASKS);
+          
+          // 添加userId索引
+          if (!taskStore.indexNames.contains("userId")) {
+            taskStore.createIndex("userId", "userId");
+          }
+          
+          // 为现有任务添加 userId 字段（默认为null）
+          const taskRequest = taskStore.openCursor();
+          taskRequest.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const task = cursor.value;
+              if (!task.hasOwnProperty("userId")) {
+                task.userId = null;
+                cursor.update(task);
+              }
+              cursor.continue();
+            }
+          };
+        }
+
+        // 为任务列表添加userId字段和索引
+        if (db.objectStoreNames.contains(STORES.TASK_LISTS)) {
+          const listStore = transaction.objectStore(STORES.TASK_LISTS);
+          
+          // 添加userId索引
+          if (!listStore.indexNames.contains("userId")) {
+            listStore.createIndex("userId", "userId");
+          }
+          
+          // 为现有任务列表添加 userId 字段（默认为null）
+          const listRequest = listStore.openCursor();
+          listRequest.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const list = cursor.value;
+              if (!list.hasOwnProperty("userId")) {
+                list.userId = null;
+                cursor.update(list);
+              }
+              cursor.continue();
+            }
+          };
+        }
+      }
     },
   });
 
@@ -187,6 +238,7 @@ export async function addTask(taskData) {
     quadrant: taskData.quadrant || 1,
     listId: taskData.listId || "today",
     estimatedTime: taskData.estimatedTime || "",
+    userId: taskData.userId || null, // 添加 userId 字段
     createdAt: new Date(),
     updatedAt: new Date(),
     order: taskData.order || 0,
@@ -296,7 +348,7 @@ export async function getActiveTaskList() {
 }
 
 // 添加新任务列表
-export async function addTaskList(name, layoutMode = "FOUR", showETA = true) {
+export async function addTaskList(name, layoutMode = "FOUR", showETA = true, userId = null) {
   const db = await initDB();
 
   const taskList = {
@@ -306,6 +358,7 @@ export async function addTaskList(name, layoutMode = "FOUR", showETA = true) {
     deleted: 0, // 0表示正常，2表示墓碑
     layoutMode,
     showETA,
+    userId: userId, // 添加 userId 字段
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -425,6 +478,7 @@ export async function insertTask(taskData) {
     listId: taskData.listId || "today",
     estimatedTime: taskData.estimatedTime || "",
     order: taskData.order || 0,
+    userId: taskData.userId || null, // 添加 userId 字段
     createdAt: taskData.createdAt || new Date(),
     updatedAt: taskData.updatedAt || new Date()
   };
@@ -445,6 +499,7 @@ export async function insertTaskList(listData) {
     deleted: listData.deleted || 0,
     layoutMode: listData.layoutMode || "FOUR",
     showETA: listData.showETA !== false ? 1 : 0,
+    userId: listData.userId || null, // 添加 userId 字段
     createdAt: listData.createdAt || new Date(),
     updatedAt: listData.updatedAt || new Date()
   };
@@ -525,6 +580,70 @@ export async function moveTask(taskId, fromQuadrant, toQuadrant, newOrder) {
     return task;
   } catch (error) {
     console.error('Move task failed:', error);
+    throw error;
+  }
+}
+
+// === 获取 userId 为 null 的数据 ===
+
+// 获取所有 userId 为 null 的任务
+export async function getNullUserIdTasks() {
+  const db = await initDB();
+  const tasks = await db.getAllFromIndex(STORES.TASKS, "userId", null);
+  
+  // 过滤掉已删除的任务（deleted = 1 或 2）
+  return tasks.filter(task => task.deleted === 0);
+}
+
+// 获取所有 userId 为 null 的任务列表
+export async function getNullUserIdTaskLists() {
+  const db = await initDB();
+  const lists = await db.getAllFromIndex(STORES.TASK_LISTS, "userId", null);
+  
+  // 过滤掉已删除的任务列表（deleted = 2）
+  return lists.filter(list => list.deleted === 0);
+}
+
+// 批量更新任务的 userId
+export async function updateTasksUserId(taskIds, userId) {
+  const db = await initDB();
+  const tx = db.transaction(STORES.TASKS, "readwrite");
+  const store = tx.objectStore(STORES.TASKS);
+  
+  try {
+    for (const taskId of taskIds) {
+      const task = await store.get(taskId);
+      if (task) {
+        task.userId = userId;
+        task.updatedAt = new Date();
+        await store.put(task);
+      }
+    }
+    await tx.done;
+  } catch (error) {
+    console.error('Update tasks userId failed:', error);
+    throw error;
+  }
+}
+
+// 批量更新任务列表的 userId
+export async function updateTaskListsUserId(listIds, userId) {
+  const db = await initDB();
+  const tx = db.transaction(STORES.TASK_LISTS, "readwrite");
+  const store = tx.objectStore(STORES.TASK_LISTS);
+  
+  try {
+    for (const listId of listIds) {
+      const list = await store.get(listId);
+      if (list) {
+        list.userId = userId;
+        list.updatedAt = new Date();
+        await store.put(list);
+      }
+    }
+    await tx.done;
+  } catch (error) {
+    console.error('Update task lists userId failed:', error);
     throw error;
   }
 }

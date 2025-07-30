@@ -35,6 +35,40 @@ export async function addToQueue(operation) {
 }
 
 /**
+ * 批量添加操作到同步队列
+ * @param {Array<Object>} operations - 操作对象数组
+ * @returns {Promise<Array<Object>>} 创建的队列项数组
+ */
+export async function batchAddToQueue(operations) {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  const tx = db.transaction(SYNC_QUEUE_STORE, 'readwrite');
+  const store = tx.objectStore(SYNC_QUEUE_STORE);
+  
+  const queueItems = [];
+  
+  for (const operation of operations) {
+    const queueItem = {
+      id: generateId(),
+      status: 'pending',
+      action: operation.action,
+      entityType: operation.entityType,
+      entityId: operation.entityId,
+      changes: operation.changes,
+      createdAt: new Date(),
+      completedAt: null,
+      retryCount: 0,
+      error: null
+    };
+    
+    await store.add(queueItem);
+    queueItems.push(queueItem);
+  }
+  
+  await tx.done;
+  return queueItems;
+}
+
+/**
  * 更新队列项状态
  * @param {string} itemId - 队列项ID
  * @param {string} status - 新状态 (pending|processing|completed|failed)
