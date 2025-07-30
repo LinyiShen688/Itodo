@@ -31,7 +31,9 @@
       "Bash(echo $SHELL)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(afplay:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(pkill:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }
