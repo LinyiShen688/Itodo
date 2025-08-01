@@ -406,7 +406,7 @@ export const useUnifiedStorage = create((set, get) => ({
   // 用户登录处理
   onUserLogin: async (user) => {
     try {
-      console.log('[UnifiedStorage] Processing user login...');
+      console.log('\x1b[36m[UnifiedStorage] 用户登录，开始处理本地与远程数据同步...\x1b[0m');
       
       // 1. 处理 userId 为 null 的本地数据
       await get().processNullUserIdData(user.id);
@@ -419,6 +419,11 @@ export const useUnifiedStorage = create((set, get) => ({
       
       // 4. 处理同步队列，推送本地数据到远程
       await get().processQueue();
+
+      // 5. 刷新全局任务列表状态，确保 UI 响应式更新
+      const { useTaskListStore } = await import('@/stores/taskListStore');
+      await useTaskListStore.getState().loadTaskLists();
+      
       
       console.log('[UnifiedStorage] User login processing completed');
     } catch (error) {

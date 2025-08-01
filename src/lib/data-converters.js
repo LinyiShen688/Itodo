@@ -67,6 +67,7 @@ export function convertSupabaseToIndexedDB(data) {
     // 任务数据转换
     return {
       id: data.id,
+      userId: data.user_id,                      // 保留 userId
       text: data.text,
       completed: data.completed ? 1 : 0,         // boolean → 0/1
       deleted: data.deleted || 0,                // 保留原值，默认为0
@@ -81,6 +82,7 @@ export function convertSupabaseToIndexedDB(data) {
     // 任务列表数据转换
     return {
       id: data.id,
+      userId: data.user_id,                      // 保留 userId
       name: data.name,
       isActive: data.is_active ? 1 : 0,          // boolean → 0/1
       deleted: data.deleted || 0,                // 保留原值，默认为0
