@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  getAllDeletedTasks,
-  getDeletedTasks,
-  restoreTask,
-  permanentDeleteTask
-} from '@/lib/indexeddb-manager';
+import { useUnifiedStorage } from '@/lib/unified-storage';
+import { useAuthStore } from '@/stores/authStore';
 
 export function useTrash(listId = null) {
   const [deletedTasks, setDeletedTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const unifiedStorage = useUnifiedStorage();
+  const authStore = useAuthStore();
 
   // 加载已删除的任务
   const loadDeletedTasks = useCallback(async () => {
@@ -21,9 +20,9 @@ export function useTrash(listId = null) {
       
       let tasks;
       if (listId) {
-        tasks = await getDeletedTasks(listId);
+        tasks = await unifiedStorage.getDeletedTasks(listId);
       } else {
-        tasks = await getAllDeletedTasks();
+        tasks = await unifiedStorage.getAllDeletedTasks();
       }
       
       setDeletedTasks(tasks);
@@ -33,7 +32,7 @@ export function useTrash(listId = null) {
     } finally {
       setLoading(false);
     }
-  }, [listId]);
+  }, [listId, unifiedStorage]);
 
   // 初始加载
   useEffect(() => {
@@ -48,7 +47,7 @@ export function useTrash(listId = null) {
   // 恢复任务
   const handleRestoreTask = useCallback(async (taskId) => {
     try {
-      await restoreTask(taskId);
+      await unifiedStorage.restoreTask(taskId, authStore);
       
       // 从本地状态中移除已恢复的任务
       setDeletedTasks(prev => prev.filter(task => task.id !== taskId));
@@ -59,12 +58,12 @@ export function useTrash(listId = null) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 永久删除任务
   const handlePermanentDeleteTask = useCallback(async (taskId) => {
     try {
-      await permanentDeleteTask(taskId);
+      await unifiedStorage.permanentDeleteTask(taskId);
       
       // 从本地状态中移除已永久删除的任务
       setDeletedTasks(prev => prev.filter(task => task.id !== taskId));
@@ -75,7 +74,7 @@ export function useTrash(listId = null) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage]);
 
   // 清空收纳箱（永久删除所有）
   const handleClearTrash = useCallback(async () => {
@@ -85,7 +84,7 @@ export function useTrash(listId = null) {
         : deletedTasks.filter(task => !listId || task.listId === listId);
       
       await Promise.all(
-        tasksToDelete.map(task => permanentDeleteTask(task.id))
+        tasksToDelete.map(task => unifiedStorage.permanentDeleteTask(task.id))
       );
       
       setDeletedTasks(prev => 
@@ -100,12 +99,12 @@ export function useTrash(listId = null) {
       setError(err.message);
       throw err;
     }
-  }, [deletedTasks, listId]);
+  }, [deletedTasks, listId, unifiedStorage]);
 
   // 批量恢复任务
   const handleRestoreMultipleTasks = useCallback(async (taskIds) => {
     try {
-      await Promise.all(taskIds.map(taskId => restoreTask(taskId)));
+      await Promise.all(taskIds.map(taskId => unifiedStorage.restoreTask(taskId, authStore)));
       
       // 从本地状态中移除已恢复的任务
       setDeletedTasks(prev => prev.filter(task => !taskIds.includes(task.id)));
@@ -116,7 +115,7 @@ export function useTrash(listId = null) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 获取已删除任务数量
   const getDeletedTaskCount = useCallback(() => {

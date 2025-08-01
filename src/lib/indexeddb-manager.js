@@ -471,19 +471,25 @@ export async function moveTask(taskId, fromQuadrant, toQuadrant, newOrder) {
 // 获取所有 userId 为 null 的任务
 export async function getNullUserIdTasks() {
   const db = await initDB();
-  const tasks = await db.getAllFromIndex(STORES.TASKS, "userId", null);
+  const allTasks = await db.getAll(STORES.TASKS);
   
-  // 过滤掉已删除的任务（deleted = 1 或 2）
-  return tasks.filter(task => task.deleted === 0);
+  // 过滤出 userId 为 null 或 undefined 的未删除任务
+  return allTasks.filter(task => 
+    (task.userId === null || task.userId === undefined || !('userId' in task)) && 
+    task.deleted === 0
+  );
 }
 
 // 获取所有 userId 为 null 的任务列表
 export async function getNullUserIdTaskLists() {
   const db = await initDB();
-  const lists = await db.getAllFromIndex(STORES.TASK_LISTS, "userId", null);
+  const allLists = await db.getAll(STORES.TASK_LISTS);
   
-  // 过滤掉已删除的任务列表（deleted = 2）
-  return lists.filter(list => list.deleted === 0);
+  // 过滤出 userId 为 null 或 undefined 的未删除任务列表
+  return allLists.filter(list => 
+    (list.userId === null || list.userId === undefined || !('userId' in list)) && 
+    list.deleted === 0
+  );
 }
 
 // 批量更新任务的 userId

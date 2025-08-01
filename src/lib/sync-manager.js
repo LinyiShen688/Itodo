@@ -125,6 +125,11 @@ export function isRetryableError(error) {
     return true;
   }
   
+  // 任务列表尚未同步的错误
+  if (error.message?.includes('not synced yet')) {
+    return true;
+  }
+  
   // 其他错误不可重试（如认证错误、数据验证错误等）
   return false;
 }

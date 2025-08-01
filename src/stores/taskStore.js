@@ -1,14 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import {
-  getAllTasks,
-  addTask as dbAddTask,
-  updateTask as dbUpdateTask,
-  deleteTask as dbDeleteTask,
-  moveTaskToQuadrant,
-  reorderTasks as dbReorderTasks
-} from '@/lib/indexeddb-manager';
+import { useUnifiedStorage } from '@/lib/unified-storage';
+import { useAuthStore } from './authStore';
 import { useTrashStore } from './trashStore';
 import { toast } from '@/utils/toast';
 
@@ -26,6 +20,7 @@ export const useTaskStore = create((set, get) => ({
   loading: false,
   error: null,
   currentListId: 'today',
+  hasInitialized: false,
   
   // 批量操作队列（性能优化）
   pendingUpdates: [],
@@ -35,11 +30,32 @@ export const useTaskStore = create((set, get) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setCurrentListId: (listId) => set({ currentListId: listId }),
+  
+  // 初始化 UnifiedStorage
+  initialize: async () => {
+    const state = get();
+    if (state.hasInitialized) return;
+    
+    const unifiedStorage = useUnifiedStorage.getState();
+    const authStore = useAuthStore.getState();
+    
+    // 初始化 UnifiedStorage，并保存清理函数
+    const cleanup = unifiedStorage.initialize(authStore);
+    set({ hasInitialized: true });
+    
+    // 返回清理函数
+    return cleanup;
+  },
 
   // 加载任务
   loadTasks: async (listId = 'today', forceLoading = false) => {
     try {
       const state = get();
+      
+      // 确保已初始化
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
       
       // 检查是否需要显示loading状态
       const isEmptyTasks = Object.values(state.tasks).every(arr => arr.length === 0);
@@ -51,7 +67,8 @@ export const useTaskStore = create((set, get) => ({
 
       set({ error: null, currentListId: listId });
 
-      const allTasks = await getAllTasks(listId);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const allTasks = await unifiedStorage.getTasks(listId);
       
       // 按象限分组
       const groupedTasks = { 1: [], 2: [], 3: [], 4: [] };
@@ -78,18 +95,28 @@ export const useTaskStore = create((set, get) => ({
   },
 
   // 添加任务
-  addTask: async (quadrant, text = '') => {
+  addTask: async (quadrant, taskData) => {
     try {
       const state = get();
+      
+      // 确保已初始化
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
+      
       const existingTasks = state.tasks[quadrant];
       const order = existingTasks.length;
       
-      const newTask = await dbAddTask({
-        text,
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      
+      const newTask = await unifiedStorage.addTask({
+        text: taskData.text || '',
+        estimatedTime: taskData.estimatedTime || '',
         quadrant,
         listId: state.currentListId,
         order
-      });
+      }, authStore);
 
       set(state => ({
         tasks: {
@@ -130,8 +157,16 @@ export const useTaskStore = create((set, get) => ({
         });
       }
 
+      // 确保已初始化
+      const state = get();
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
+      
       // 实际数据库更新
-      const updatedTask = await dbUpdateTask(taskId, updates);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      const updatedTask = await unifiedStorage.updateTask(taskId, updates, authStore);
 
       // 确保UI与数据库同步
       if (!optimistic) {
@@ -165,7 +200,15 @@ export const useTaskStore = create((set, get) => ({
   // 删除任务（软删除）
   deleteTask: async (taskId) => {
     try {
-      await dbDeleteTask(taskId);
+      // 确保已初始化
+      const state = get();
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
+      
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      await unifiedStorage.deleteTask(taskId, false, authStore);
 
       set(state => {
         const newTasks = { ...state.tasks };
@@ -233,7 +276,16 @@ export const useTaskStore = create((set, get) => ({
         return { tasks: newTasks };
       });
 
-      await moveTaskToQuadrant(taskId, toQuadrant, newOrder);
+      // 确保已初始化
+      const state = get();
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
+      
+      // 更新数据库
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      await unifiedStorage.updateTask(taskId, { quadrant: toQuadrant, order: newOrder }, authStore);
     } catch (err) {
       console.error('Failed to move task:', err);
       // 回滚
@@ -263,8 +315,15 @@ export const useTaskStore = create((set, get) => ({
         }
       }));
 
+      // 确保已初始化
+      const state = get();
+      if (!state.hasInitialized) {
+        await get().initialize();
+      }
+      
       // 持久化到数据库
-      await dbReorderTasks(reorderedTasks);
+      const unifiedStorage = useUnifiedStorage.getState();
+      await unifiedStorage.reorderTasks(reorderedTasks);
     } catch (err) {
       console.error('Failed to reorder tasks:', err);
       // 回滚

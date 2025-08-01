@@ -6,6 +6,9 @@ const DB_NAME = 'iTodoApp';
 const DB_VERSION = 1;
 const SYNC_QUEUE_STORE = 'syncQueue';
 
+// 延迟函数，确保队列项有不同的时间戳
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * 添加操作到同步队列
  * @param {Object} operation - 操作对象
@@ -16,6 +19,9 @@ const SYNC_QUEUE_STORE = 'syncQueue';
  * @returns {Promise<Object>} 创建的队列项
  */
 export async function addToQueue(operation) {
+  // 添加 1ms 延迟，确保时间戳唯一
+  await sleep(1);
+  
   const queueItem = {
     id: generateId(),
     status: 'pending',
@@ -45,10 +51,12 @@ export async function batchAddToQueue(operations) {
   const store = tx.objectStore(SYNC_QUEUE_STORE);
   
   const queueItems = [];
-  const addPromises = [];
   
-  // 创建所有队列项并收集 promises
+  // 顺序创建队列项，每个之间有 1ms 延迟
   for (const operation of operations) {
+    // 添加 1ms 延迟，确保每个项有不同时间戳
+    // await sleep(1);
+    
     const queueItem = {
       id: generateId(),
       status: 'pending',
@@ -62,13 +70,10 @@ export async function batchAddToQueue(operations) {
       error: null
     };
     
-    // 收集每个 add 操作的 promise
-    addPromises.push(store.add(queueItem));
+    // 立即添加到存储
+    await store.add(queueItem);
     queueItems.push(queueItem);
   }
-  
-  // 并行执行所有 add 操作
-  await Promise.all(addPromises);
   
   // 等待事务完成
   await tx.done;
@@ -139,7 +144,9 @@ export async function deleteQueueItem(itemId) {
  */
 export async function getPendingItems() {
   const db = await openDB(DB_NAME, DB_VERSION);
-  return await db.getAllFromIndex(SYNC_QUEUE_STORE, 'status', 'pending');
+  const items = await db.getAllFromIndex(SYNC_QUEUE_STORE, 'status', 'pending');
+  // 按创建时间排序，确保先进先出（FIFO）
+  return items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 /**
  * 获取同步状态汇总
@@ -155,11 +162,15 @@ export async function getSyncStatus() {
     db.getAllFromIndex(SYNC_QUEUE_STORE, 'status', 'completed')
   ]);
   
+  // 对每个数组按创建时间排序（FIFO）
+  const sortByCreatedAt = (items) => 
+    items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  
   return { 
-    pending, 
-    processing, 
-    failed, 
-    completed
+    pending: sortByCreatedAt(pending), 
+    processing: sortByCreatedAt(processing), 
+    failed: sortByCreatedAt(failed), 
+    completed: sortByCreatedAt(completed)
   };
 }
 
@@ -172,7 +183,9 @@ export async function getSyncStatus() {
  */
 export async function getItemsByStatus(status) {
   const db = await openDB(DB_NAME, DB_VERSION);
-  return await db.getAllFromIndex(SYNC_QUEUE_STORE, 'status', status);
+  const items = await db.getAllFromIndex(SYNC_QUEUE_STORE, 'status', status);
+  // 按创建时间排序，确保先进先出（FIFO）
+  return items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 /**
@@ -183,7 +196,10 @@ export async function getItemsByStatus(status) {
 export async function getItemsByEntityId(entityId) {
   const db = await openDB(DB_NAME, DB_VERSION);
   const allItems = await db.getAll(SYNC_QUEUE_STORE);
-  return allItems.filter(item => item.entityId === entityId);
+  // 过滤后按创建时间排序，确保先进先出（FIFO）
+  return allItems
+    .filter(item => item.entityId === entityId)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 /**

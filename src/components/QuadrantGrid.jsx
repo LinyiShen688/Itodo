@@ -197,7 +197,7 @@ export default function QuadrantGrid() {
                 isFirst={config.isFirst}
                 tasks={layoutMode === 'FOUR' ? (tasks[config.id] || []) : flattenTasks(tasks)}
                 isLoading={loading}
-                onAddTask={text => addTask(config.id, text)}
+                onAddTask={taskData => addTask(config.id, taskData)}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
                 onToggleComplete={toggleComplete}

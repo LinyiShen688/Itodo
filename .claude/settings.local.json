@@ -33,7 +33,8 @@
       "Bash(afplay:*)",
       "Bash(cat:*)",
       "Bash(pkill:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(tree:*)"
     ],
     "deny": []
   }

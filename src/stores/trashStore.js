@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { getAllDeletedTasks } from '@/lib/indexeddb-manager';
+import { useUnifiedStorage } from '@/lib/unified-storage';
 
 export const useTrashStore = create((set, get) => ({
   deletedTaskCount: 0,
@@ -9,7 +9,8 @@ export const useTrashStore = create((set, get) => ({
   // 更新删除任务数量
   updateDeletedTaskCount: async () => {
     try {
-      const deletedTasks = await getAllDeletedTasks();
+      const unifiedStorage = useUnifiedStorage.getState();
+      const deletedTasks = await unifiedStorage.getAllDeletedTasks();
       set({ deletedTaskCount: deletedTasks.length });
     } catch (error) {
       console.error('Failed to update deleted task count:', error);

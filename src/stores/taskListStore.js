@@ -1,15 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import {
-  getAllTaskLists,
-  getActiveTaskList,
-  addTaskList as dbAddTaskList,
-  updateTaskList as dbUpdateTaskList,
-  setActiveTaskList as dbSetActiveTaskList,
-  deleteTaskList as dbDeleteTaskList
-} from '@/lib/indexeddb-manager';
+import { useUnifiedStorage } from '@/lib/unified-storage';
 import { useTaskStore } from './taskStore';
+import { useAuthStore } from './authStore';
 
 export const useTaskListStore = create((set, get) => ({
   // 状态
@@ -17,6 +11,7 @@ export const useTaskListStore = create((set, get) => ({
   activeList: null,
   loading: false,
   error: null,
+  hasInitialized: false,
 
   // 基础操作
   setLoading: (loading) => set({ loading }),
@@ -27,9 +22,10 @@ export const useTaskListStore = create((set, get) => ({
     try {
       set({ loading: true, error: null });
       
+      const unifiedStorage = useUnifiedStorage.getState();
       const [lists, active] = await Promise.all([
-        getAllTaskLists(),
-        getActiveTaskList()
+        unifiedStorage.getTaskLists(),
+        unifiedStorage.getActiveTaskList()
       ]);
       
       set({ 
@@ -51,7 +47,9 @@ export const useTaskListStore = create((set, get) => ({
   // 添加新任务列表
   addTaskList: async (name, layoutMode = 'FOUR', showETA = true) => {
     try {
-      const newList = await dbAddTaskList(name, layoutMode, showETA);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      const newList = await unifiedStorage.addTaskList(name, layoutMode, showETA, authStore);
       
       set(state => ({
         taskLists: [...state.taskLists, newList]
@@ -68,7 +66,9 @@ export const useTaskListStore = create((set, get) => ({
   // 更新任务列表
   updateTaskList: async (id, updates) => {
     try {
-      const updatedList = await dbUpdateTaskList(id, updates);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      const updatedList = await unifiedStorage.updateTaskList(id, updates, authStore);
       
       set(state => ({
         taskLists: state.taskLists.map(list => 
@@ -88,7 +88,9 @@ export const useTaskListStore = create((set, get) => ({
   // 设置活动任务列表
   setActiveList: async (id) => {
     try {
-      const newActiveList = await dbSetActiveTaskList(id);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      const newActiveList = await unifiedStorage.setActiveTaskList(id, authStore);
       
       set(state => ({
         taskLists: state.taskLists.map(list => ({
@@ -120,7 +122,9 @@ export const useTaskListStore = create((set, get) => ({
         throw new Error('至少需要保留一个任务列表');
       }
       
-      await dbDeleteTaskList(id);
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      await unifiedStorage.deleteTaskList(id, authStore);
       
       const remainingLists = state.taskLists.filter(list => list.id !== id);
       let newActiveList = state.activeList;
@@ -128,7 +132,7 @@ export const useTaskListStore = create((set, get) => ({
       // 如果删除的是当前活动列表，设置第一个列表为活动列表
       if (state.activeList?.id === id) {
         if (remainingLists.length > 0) {
-          newActiveList = await dbSetActiveTaskList(remainingLists[0].id);
+          newActiveList = await unifiedStorage.setActiveTaskList(remainingLists[0].id, authStore);
           // 加载新活动列表的任务
           useTaskStore.getState().loadTasks(newActiveList.id);
         } else {
@@ -167,22 +171,38 @@ export const useTaskListStore = create((set, get) => ({
 
   // 初始化
   initialize: async () => {
+    const state = get();
+    
+    // 初始化 UnifiedStorage（如果还没初始化）
+    if (!state.hasInitialized) {
+      const unifiedStorage = useUnifiedStorage.getState();
+      const authStore = useAuthStore.getState();
+      unifiedStorage.initialize(authStore);
+      set({ hasInitialized: true });
+      
+      // 同时初始化 taskStore
+      await useTaskStore.getState().initialize();
+    }
+    
     await get().loadTaskLists();
     
     // 检查是否有任务列表，如果没有则创建默认列表
-    const state = get();
-    if (state.taskLists.length === 0) {
+    const currentState = get();
+    if (currentState.taskLists.length === 0) {
       try {
+        const unifiedStorage = useUnifiedStorage.getState();
+        const authStore = useAuthStore.getState();
+        
         // 创建默认任务列表
-        const defaultList = await dbAddTaskList('今天要做的事', 'FOUR', true, null);
+        const defaultList = await unifiedStorage.addTaskList('今天要做的事', 'FOUR', true, authStore);
         
         // 设置为活动列表
-        const activeList = await dbSetActiveTaskList(defaultList.id);
+        const activeList = await unifiedStorage.setActiveTaskList(defaultList.id, authStore);
         
-        set(state => ({
+        set({
           taskLists: [defaultList],
           activeList: activeList
-        }));
+        });
         
         // 加载该列表的任务（虽然是空的）
         useTaskStore.getState().loadTasks(defaultList.id);

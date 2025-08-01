@@ -1,20 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  getAllTaskLists,
-  getActiveTaskList,
-  addTaskList,
-  updateTaskList,
-  setActiveTaskList,
-  deleteTaskList
-} from '@/lib/indexeddb-manager';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useUnifiedStorage } from '@/lib/unified-storage';
+import { useAuthStore } from '@/stores/authStore';
 
 export function useTaskLists() {
   const [taskLists, setTaskLists] = useState([]);
   const [activeList, setActiveList] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // 使用 UnifiedStorage 和 AuthStore
+  const unifiedStorage = useUnifiedStorage();
+  const authStore = useAuthStore();
+  const hasInitialized = useRef(false);
+  
+  // 初始化 UnifiedStorage（只执行一次）
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      const cleanup = unifiedStorage.initialize(authStore);
+      return cleanup;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 加载任务列表
   const loadTaskLists = useCallback(async () => {
@@ -23,8 +32,8 @@ export function useTaskLists() {
       setError(null);
       
       const [lists, active] = await Promise.all([
-        getAllTaskLists(),
-        getActiveTaskList()
+        unifiedStorage.getTaskLists(),
+        unifiedStorage.getActiveTaskList()
       ]);
       
       setTaskLists(lists);
@@ -35,7 +44,7 @@ export function useTaskLists() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [unifiedStorage]);
 
   // 初始加载
   useEffect(() => {
@@ -45,7 +54,7 @@ export function useTaskLists() {
   // 添加新任务列表
   const handleAddTaskList = useCallback(async (name, layoutMode = 'FOUR', showETA = true) => {
     try {
-      const newList = await addTaskList(name, layoutMode, showETA);
+      const newList = await unifiedStorage.addTaskList(name, layoutMode, showETA, authStore);
       setTaskLists(prev => [...prev, newList]);
       return newList;
     } catch (err) {
@@ -53,12 +62,12 @@ export function useTaskLists() {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 更新任务列表
   const handleUpdateTaskList = useCallback(async (id, updates) => {
     try {
-      const updatedList = await updateTaskList(id, updates);
+      const updatedList = await unifiedStorage.updateTaskList(id, updates, authStore);
       
       setTaskLists(prev => 
         prev.map(list => 
@@ -77,12 +86,12 @@ export function useTaskLists() {
       setError(err.message);
       throw err;
     }
-  }, [activeList]);
+  }, [activeList, unifiedStorage, authStore]);
 
   // 设置活动任务列表
   const handleSetActiveList = useCallback(async (id) => {
     try {
-      const newActiveList = await setActiveTaskList(id);
+      const newActiveList = await unifiedStorage.setActiveTaskList(id, authStore);
       
       // 更新任务列表状态
       setTaskLists(prev => 
@@ -104,7 +113,7 @@ export function useTaskLists() {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 删除任务列表
   const handleDeleteTaskList = useCallback(async (id) => {
@@ -112,7 +121,7 @@ export function useTaskLists() {
       // 检查是否是活动列表
       const isActiveList = activeList && activeList.id === id;
       
-      await deleteTaskList(id);
+      await unifiedStorage.deleteTaskList(id, authStore);
       
       // 从列表中移除
       setTaskLists(prev => prev.filter(list => list.id !== id));
@@ -134,7 +143,7 @@ export function useTaskLists() {
       setError(err.message);
       throw err;
     }
-  }, [activeList, taskLists, handleSetActiveList]);
+  }, [activeList, taskLists, handleSetActiveList, unifiedStorage, authStore]);
 
   // 监听全局事件，跨组件同步
   useEffect(() => {

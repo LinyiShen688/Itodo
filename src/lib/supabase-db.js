@@ -13,7 +13,7 @@ import { convertIndexedDBToSupabase, convertSupabaseToIndexedDB } from './data-c
 
 // 获取 Supabase 客户端实例
 let supabase = null;
-function getSupabase() {
+export function getSupabase() {
   if (!supabase) {
     supabase = createClient();
   }
@@ -292,7 +292,19 @@ export async function addSupabaseTaskList(name, options = {}) {
     
     return convertSupabaseToIndexedDB(data);
   } catch (error) {
-    console.error('Add task list failed:', error);
+    // 更详细的错误日志
+    console.error('Add task list failed:', {
+      error: error,
+      message: error?.message || 'Unknown error',
+      code: error?.code || 'NO_CODE',
+      details: error?.details || error,
+      hint: error?.hint,
+      // 添加更多调试信息
+      taskListData: taskListData,
+      errorString: JSON.stringify(error),
+      errorType: typeof error,
+      errorKeys: error ? Object.keys(error) : []
+    });
     throw error;
   }
 }
@@ -310,13 +322,16 @@ export async function updateSupabaseTaskList(id, updates) {
     
     // 准备更新数据
     const updateData = {};
-    
+    //输出一个有颜色的log
+    console.log('\x1b[32m%s\x1b[0m', 'updateSupabaseTaskList',id, updates);
     if ('name' in updates) updateData.name = updates.name;
     if ('isActive' in updates) updateData.is_active = updates.isActive === 1;
     if ('deleted' in updates) updateData.deleted = updates.deleted;
     if ('layoutMode' in updates) updateData.layout_mode = updates.layoutMode;
     if ('showETA' in updates) updateData.show_eta = updates.showETA;
     
+
+
     const { data, error } = await supabase
       .from('task_lists')
       .update(updateData)

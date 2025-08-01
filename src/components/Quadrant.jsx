@@ -45,6 +45,12 @@ export default function Quadrant({
   const [isEditing, setIsEditing] = useState(false);
   const [visibleTaskLimit, setVisibleTaskLimit] = useState(20); // 初始显示20个任务
   const titleInputRef = useRef(null);
+  
+  // 新增：临时任务输入状态
+  const [isAddingNewTask, setIsAddingNewTask] = useState(false);
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskTime, setNewTaskTime] = useState('');
+  const newTaskInputRef = useRef(null);
 
   // 记忆化任务 ID 列表，避免不必要的重渲染
   const taskIds = useMemo(() => tasks.map(task => task.id), [tasks]);
@@ -112,17 +118,78 @@ export default function Quadrant({
 
   // 处理点击空白区域添加任务
   const handleQuadrantClick = async (e) => {
-    // 只有点击空白区域才添加任务
+    // 只有点击空白区域才显示输入框
     if (e.target.classList.contains('quadrant') || 
         e.target.classList.contains('task-list')) {
+      // 不再立即创建任务，而是显示输入框
+      setIsAddingNewTask(true);
+      setNewTaskText('');
+      setNewTaskTime('');
+    }
+  };
+
+  // 处理新任务文本输入
+  const handleNewTaskTextChange = (e) => {
+    setNewTaskText(e.target.value);
+    // 自动调整高度
+    if (newTaskInputRef.current) {
+      newTaskInputRef.current.style.height = 'auto';
+      newTaskInputRef.current.style.height = newTaskInputRef.current.scrollHeight + 'px';
+    }
+  };
+
+  // 处理新任务时间输入
+  const handleNewTaskTimeChange = (e) => {
+    setNewTaskTime(e.target.value);
+  };
+
+  // 确认创建新任务
+  const handleNewTaskSubmit = async () => {
+    const trimmedText = newTaskText.trim();
+    if (trimmedText) {
       try {
-        const newTask = await onAddTask('');
-        // 可以在这里添加聚焦到新任务的逻辑
+        // 创建包含所有字段的任务数据
+        const taskData = {
+          text: trimmedText,
+          estimatedTime: newTaskTime.trim()
+        };
+        
+        // 一次性创建包含所有数据的任务，只产生一次 add 同步
+        const newTask = await onAddTask(taskData);
+        
+        // 重置状态
+        setIsAddingNewTask(false);
+        setNewTaskText('');
+        setNewTaskTime('');
       } catch (error) {
         console.error('Failed to add task:', error);
       }
     }
   };
+
+  // 取消创建新任务
+  const handleNewTaskCancel = () => {
+    setIsAddingNewTask(false);
+    setNewTaskText('');
+    setNewTaskTime('');
+  };
+
+  // 处理新任务输入的键盘事件
+  const handleNewTaskKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleNewTaskSubmit();
+    } else if (e.key === 'Escape') {
+      handleNewTaskCancel();
+    }
+  };
+
+  // 自动聚焦新任务输入框
+  useEffect(() => {
+    if (isAddingNewTask && newTaskInputRef.current) {
+      newTaskInputRef.current.focus();
+    }
+  }, [isAddingNewTask]);
 
   const quadrantClass = `quadrant ${QUADRANT_CLASSES[quadrantId]} ${isLoading ? 'loading' : ''}`;
   
@@ -165,6 +232,68 @@ export default function Quadrant({
         className={`task-list ${isOver ? 'drag-over' : ''}`} 
         data-quadrant={quadrantId}
       >
+        {/* 新任务输入框 - 显示在任务列表顶部 */}
+        {isAddingNewTask && (
+          <div className="task-item task-item-editing" style={{ marginBottom: '8px' }}>
+            {/* 复选框占位 */}
+            <div className="task-checkbox"></div>
+            
+            <div className="task-content">
+              {/* 任务主内容行 */}
+              <div className="task-main-line flex items-center flex-wrap gap-2">
+                <textarea
+                  ref={newTaskInputRef}
+                  className="task-text"
+                  value={newTaskText}
+                  onChange={handleNewTaskTextChange}
+                  onKeyDown={handleNewTaskKeyDown}
+                  placeholder="输入任务"
+                  rows={1}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+              </div>
+
+              {/* 扩展区域 */}
+              <div className="task-edit-expansion show">
+                {showETA && (
+                  <div className="task-time-editor">
+                    <textarea
+                      className="task-time-input"
+                      value={newTaskTime}
+                      onChange={handleNewTaskTimeChange}
+                      onKeyDown={handleNewTaskKeyDown}
+                      placeholder="预计时间，如30分钟"
+                      rows={1}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+
+                {/* 按钮栏 */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    className="task-cancel-btn"
+                    onClick={handleNewTaskCancel}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="task-confirm-btn"
+                    onClick={handleNewTaskSubmit}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    确认
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 删除按钮占位 */}
+            <span className="task-delete" style={{ visibility: 'hidden' }}>×</span>
+          </div>
+        )}
+
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {visibleTasks.map((task) => (
             <MemoizedTaskItem

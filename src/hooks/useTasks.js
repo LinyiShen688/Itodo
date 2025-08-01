@@ -1,15 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  getAllTasks,
-  getTasksByQuadrant,
-  addTask,
-  updateTask,
-  deleteTask,
-  moveTaskToQuadrant,
-  reorderTasks
-} from '@/lib/indexeddb-manager';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useUnifiedStorage } from '@/lib/unified-storage';
+import { useAuthStore } from '@/stores/authStore';
 import { useTrashStore } from '@/stores/trashStore';
 
 export function useTasks(listId = 'today') {
@@ -23,6 +16,21 @@ export function useTasks(listId = 'today') {
   const [error, setError] = useState(null);
   const [currentListId, setCurrentListId] = useState(listId);
   const incrementDeletedCount = useTrashStore((state) => state.incrementDeletedCount);
+  
+  // 使用 UnifiedStorage 和 AuthStore
+  const unifiedStorage = useUnifiedStorage();
+  const authStore = useAuthStore();
+  const hasInitialized = useRef(false);
+  
+  // 初始化 UnifiedStorage（只执行一次）
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      const cleanup = unifiedStorage.initialize(authStore);
+      return cleanup;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 加载任务
   const loadTasks = useCallback(async (forceLoading = false) => {
@@ -37,7 +45,7 @@ export function useTasks(listId = 'today') {
       
       setError(null);
       
-      const allTasks = await getAllTasks(listId);
+      const allTasks = await unifiedStorage.getTasks(listId);
       
       // 按象限分组
       const groupedTasks = {
@@ -69,7 +77,7 @@ export function useTasks(listId = 'today') {
     } finally {
       setLoading(false);
     }
-  }, [listId, currentListId, tasks]);
+  }, [listId, currentListId, tasks, unifiedStorage]);
 
   // 初始加载
   useEffect(() => {
@@ -84,17 +92,21 @@ export function useTasks(listId = 'today') {
   }, [listId, currentListId, loadTasks]);
 
   // 添加新任务
-  const handleAddTask = useCallback(async (quadrant, text = '') => {
+  const handleAddTask = useCallback(async (quadrant, taskData) => {
     try {
       const existingTasks = tasks[quadrant];
       const order = existingTasks.length;
       
-      const newTask = await addTask({
-        text,
+      // 统一使用对象参数
+      const taskInfo = {
+        text: taskData.text || '',
+        estimatedTime: taskData.estimatedTime || '',
         quadrant,
         listId,
         order
-      });
+      };
+      
+      const newTask = await unifiedStorage.addTask(taskInfo, authStore);
       
       setTasks(prev => ({
         ...prev,
@@ -107,12 +119,12 @@ export function useTasks(listId = 'today') {
       setError(err.message);
       throw err;
     }
-  }, [tasks, listId]);
+  }, [tasks, listId, unifiedStorage, authStore]);
 
   // 更新任务
   const handleUpdateTask = useCallback(async (taskId, updates) => {
     try {
-      const updatedTask = await updateTask(taskId, updates);
+      const updatedTask = await unifiedStorage.updateTask(taskId, updates, authStore);
       
       setTasks(prev => {
         const newTasks = { ...prev };
@@ -135,12 +147,12 @@ export function useTasks(listId = 'today') {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 删除任务
   const handleDeleteTask = useCallback(async (taskId) => {
     try {
-      await deleteTask(taskId);
+      await unifiedStorage.deleteTask(taskId, false, authStore);
       
       setTasks(prev => {
         const newTasks = { ...prev };
@@ -160,12 +172,12 @@ export function useTasks(listId = 'today') {
       setError(err.message);
       throw err;
     }
-  }, [incrementDeletedCount]);
+  }, [incrementDeletedCount, unifiedStorage, authStore]);
 
   // 移动任务到不同象限
   const handleMoveTask = useCallback(async (taskId, fromQuadrant, toQuadrant, newOrder = 0) => {
     try {
-      await moveTaskToQuadrant(taskId, toQuadrant, newOrder);
+      await unifiedStorage.updateTask(taskId, { quadrant: toQuadrant, order: newOrder }, authStore);
       
       setTasks(prev => {
         const newTasks = { ...prev };
@@ -195,7 +207,7 @@ export function useTasks(listId = 'today') {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [unifiedStorage, authStore]);
 
   // 重新排序象限内的任务
   const handleReorderTasks = useCallback(async (quadrant, reorderedTasks) => {
@@ -207,7 +219,7 @@ export function useTasks(listId = 'today') {
       }));
       
       // 保存到数据库
-      await reorderTasks(reorderedTasks);
+      await unifiedStorage.reorderTasks(reorderedTasks);
     } catch (err) {
       console.error('Failed to reorder tasks:', err);
       setError(err.message);
@@ -215,7 +227,7 @@ export function useTasks(listId = 'today') {
       await loadTasks();
       throw err;
     }
-  }, [loadTasks]);
+  }, [loadTasks, unifiedStorage]);
 
   // 切换任务完成状态
   const handleToggleComplete = useCallback(async (taskId) => {
@@ -253,7 +265,7 @@ export function useTasks(listId = 'today') {
 
     // 持久化 order
     try {
-      await reorderTasks(
+      await unifiedStorage.reorderTasks(
         quadrantTasks
           .map(t => (t.id === taskId ? { ...t, completed: newCompleted } : t))
           .sort((a, b) => {
@@ -266,7 +278,7 @@ export function useTasks(listId = 'today') {
     }
 
     return updatedTask;
-  }, [tasks, handleUpdateTask]);
+  }, [tasks, handleUpdateTask, unifiedStorage]);
 
   // 更新任务文本和预计时间
   const handleUpdateTaskText = useCallback(async (taskId, updates) => {

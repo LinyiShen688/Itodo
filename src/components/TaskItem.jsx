@@ -13,11 +13,11 @@ export default function TaskItem({
   setActivatorNodeRef,
   showETA = true
 }) {
-  // 空白任务自动进入编辑模式
-  const [isEditing, setIsEditing] = useState(task.text.trim() === '');
+  // 编辑状态管理
+  const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState(task.text);
   const [currentEstimatedTime, setCurrentEstimatedTime] = useState(task.estimatedTime || '');
-  const [showEditOptions, setShowEditOptions] = useState(task.text.trim() === ''); // 新建空白任务默认显示
+  const [showEditOptions, setShowEditOptions] = useState(false);
   const textInputRef = useRef(null);
   const timeInputRef = useRef(null);
 
@@ -70,7 +70,7 @@ export default function TaskItem({
   const handleCancel = () => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
-    setShowEditOptions(task.text.trim() !== ''); // 重置显示状态
+    setShowEditOptions(false); // 重置显示状态
     setIsEditing(false);
   };
 
@@ -106,18 +106,11 @@ export default function TaskItem({
     }
   }, [isEditing]);
 
-  // 同步任务最新文本及预计时间。
-  // 仅在未处于编辑模式时，才根据内容决定是否折叠编辑选项，
-  // 避免正在编辑时因自动保存导致折叠按钮/时间输入。
+  // 同步任务最新文本及预计时间
   useEffect(() => {
     setCurrentText(task.text);
     setCurrentEstimatedTime(task.estimatedTime || '');
-
-    // 若当前并非编辑状态，再根据 text 是否为空来决定 showEditOptions
-    if (!isEditing) {
-      setShowEditOptions(task.text.trim() === ''); // 空白任务保持展开
-    }
-  }, [task.text, task.estimatedTime, isEditing]);
+  }, [task.text, task.estimatedTime]);
 
   // 处理复选框点击
   const handleCheckboxClick = async (e) => {

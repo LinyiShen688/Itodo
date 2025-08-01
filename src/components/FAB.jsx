@@ -7,8 +7,8 @@ export default function FAB() {
 
   const handleAddTask = async () => {
     try {
-      // 默认添加到第一象限
-      await addTask(1, '');
+      // 默认添加到第一象限，传递对象参数
+      await addTask(1, { text: '', estimatedTime: '' });
     } catch (error) {
       console.error('Failed to add task:', error);
     }
