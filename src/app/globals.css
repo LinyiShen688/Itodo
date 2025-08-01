@@ -4,21 +4,22 @@
 
 
 :root {
-  --parchment: #f4e8d0;
-  --parchment-dark: #e8dcc4;
-  --ink-black: #2c2416;
-  --ink-brown: #5c4033;
-  --accent-gold: #d4a574;
-  --shadow-soft: rgba(92, 64, 51, 0.1);
-  --white-trans: rgba(255, 255, 255, 0.6);
+  --parchment: #fcf5e9;           /* 温暖的米白背景 */
+  --parchment-dark: #f7ede0;     /* 稍深的米白 */
+  --ink-black: #1d1d1f;          /* Apple经典深灰 */
+  --ink-brown: #424245;          /* 中性灰色文字 */
+  --accent-gold: #5D4E37;        /* 深咖啡色强调 */
+  --shadow-soft: rgba(29, 29, 31, 0.04);
+  --white-trans: rgba(254, 251, 246, 0.85);
   
   /* 四象限颜色 */
-  --urgent-important: #e74c3c;      /* 优雅的红色 */
-  --important-not-urgent: #3498db;  /* 沉稳的蓝色 */
-  --urgent-not-important: #27ae60;  /* 清新的绿色 */
-  --not-urgent-not-important: #95a5a6; /* 中性灰色 */
+  --urgent-important: #ff3b30;      /* Apple红色 */
+  --important-not-urgent: #6B6B6B;  /* 温暖灰色 */
+  --urgent-not-important: #34c759;  /* Apple绿色 */
+  --not-urgent-not-important: #8e8e93; /* Apple灰色 */
   
-  --texture-color: rgba(92, 64, 51, 0.02);
+  --texture-color: rgba(29, 29, 31, 0.015);
+  --quadrant-bg: #fefbf6;
 }
 
 /* 简约主题 - Apple级别设计美感 */
@@ -40,6 +41,25 @@
   --important-not-urgent: #6B6B6B;  /* 温暖灰色 */
   --urgent-not-important: #34c759;  /* Apple绿色 */
   --not-urgent-not-important: #8e8e93; /* Apple灰色 */
+}
+
+/* 羊皮纸经典主题 */
+[data-theme="parchment"] {
+  --parchment: #f4e8d0;
+  --parchment-dark: #e8dcc4;
+  --ink-black: #2c2416;
+  --ink-brown: #5c4033;
+  --accent-gold: #d4a574;
+  --shadow-soft: rgba(92, 64, 51, 0.1);
+  --white-trans: rgba(255, 255, 255, 0.6);
+  
+  /* 四象限颜色 */
+  --urgent-important: #e74c3c;      /* 优雅的红色 */
+  --important-not-urgent: #3498db;  /* 沉稳的蓝色 */
+  --urgent-not-important: #27ae60;  /* 清新的绿色 */
+  --not-urgent-not-important: #95a5a6; /* 中性灰色 */
+  
+  --texture-color: rgba(92, 64, 51, 0.02);
 }
 
 /* 墨水深蓝主题 */

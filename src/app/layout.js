@@ -11,6 +11,23 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="zh-CN">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const stored = localStorage.getItem('iTodo-theme');
+                  const theme = stored ? JSON.parse(stored) : 'minimal';
+                  document.documentElement.setAttribute('data-theme', theme);
+                } catch (e) {
+                  document.documentElement.setAttribute('data-theme', 'minimal');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning={true}>
         <ThemeProvider>
           <AppSettingsProvider>
