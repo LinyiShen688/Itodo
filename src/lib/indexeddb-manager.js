@@ -154,10 +154,9 @@ export async function deleteTask(id) {
   return await updateTask(id, { deleted: 1 });
 }
 
-// 硬删除任务（永久删除）
+// 永久删除任务（使用墓碑模式）
 export async function permanentDeleteTask(id) {
-  const db = await initDB();
-  await db.delete(STORES.TASKS, id);
+  return await updateTask(id, { deleted: 2 });
 }
 
 // 恢复已删除的任务

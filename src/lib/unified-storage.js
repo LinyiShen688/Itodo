@@ -400,7 +400,22 @@ export const useUnifiedStorage = create((set, get) => ({
   },
 
   permanentDeleteTask: async (id) => {
-    return await dbManager.permanentDeleteTask(id);
+    // 1. 更新本地删除状态为墓碑
+    const deletedTask = await dbManager.permanentDeleteTask(id);
+    
+    // 2. 如果已登录，同步删除状态
+    if (useAuthStore.getState().isAuthenticated()) {
+      await queueManager.addToQueue({
+        action: 'update',
+        entityType: 'task',
+        entityId: id,
+        changes: { deleted: 2 }
+      });
+      
+      get().processQueue();
+    }
+    
+    return deletedTask;
   },
 
   // 用户登录处理

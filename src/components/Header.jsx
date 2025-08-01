@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { User, LogOut, Menu, Clock, BarChart3, Palette } from "lucide-react";
+import { User, LogOut, Menu, Clock, BarChart3, Palette, RefreshCw } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/stores/authStore";
 import PomodoroTimer from "./PomodoroTimer";
 import SummaryModal from "./SummaryModal";
 import AuthModal from "./AuthModal";
+import SyncProgressModal from "./SyncProgressModal";
 
 export default function Header({ currentTaskName = "今日待办" }) {
   const { theme, setTheme, themes } = useTheme();
@@ -15,6 +16,7 @@ export default function Header({ currentTaskName = "今日待办" }) {
   const [showPomodoro, setShowPomodoro] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSyncProgress, setShowSyncProgress] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   
@@ -188,6 +190,16 @@ export default function Header({ currentTaskName = "今日待办" }) {
                         </div>
                       </div>
                       <button
+                        onClick={() => {
+                          setShowSyncProgress(true);
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
+                      >
+                        <RefreshCw size={16} />
+                        <span className="font-['Noto_Serif_SC']">同步进度</span>
+                      </button>
+                      <button
                         onClick={handleAuthAction}
                         className="w-full px-4 py-2 text-left text-[var(--ink-brown)] hover:bg-[var(--parchment)] transition-colors duration-200 flex items-center space-x-3"
                       >
@@ -221,6 +233,12 @@ export default function Header({ currentTaskName = "今日待办" }) {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+      />
+
+      {/* 同步进度弹窗组件 */}
+      <SyncProgressModal
+        isOpen={showSyncProgress}
+        onClose={() => setShowSyncProgress(false)}
       />
     </>
   );
