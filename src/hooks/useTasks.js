@@ -5,7 +5,8 @@ import { useUnifiedStorage } from '@/lib/unified-storage';
 import { useAuthStore } from '@/stores/authStore';
 import { useTrashStore } from '@/stores/trashStore';
 
-export function useTasks(listId = 'today') {
+export function useTasks(listId) {
+  if (!listId) throw new Error('listId is required for useTasks hook');
   const [tasks, setTasks] = useState({
     1: [], // 重要且紧急
     2: [], // 重要不紧急

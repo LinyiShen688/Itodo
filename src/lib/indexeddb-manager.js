@@ -74,7 +74,8 @@ export function generateId() {
 // === 任务操作 ===
 
 // 获取所有任务（按象限和顺序排序，默认过滤已删除任务）
-export async function getAllTasks(listId = "today", includeDeleted = false) {
+export async function getAllTasks(listId, includeDeleted = false) {
+  if (!listId) throw new Error('listId is required');
   const db = await initDB();
   const tasks = await db.getAllFromIndex(STORES.TASKS, "listId", listId);
 
@@ -95,9 +96,10 @@ export async function getAllTasks(listId = "today", includeDeleted = false) {
 // 获取指定象限的任务
 export async function getTasksByQuadrant(
   quadrant,
-  listId = "today",
+  listId,
   includeDeleted = false
 ) {
+  if (!listId) throw new Error('listId is required');
   const db = await initDB();
   const allTasks = await db.getAllFromIndex(STORES.TASKS, "listId", listId);
 
@@ -110,6 +112,7 @@ export async function getTasksByQuadrant(
 
 // 添加新任务
 export async function addTask(taskData) {
+  if (!taskData.listId) throw new Error('listId is required');
   const db = await initDB();
 
   const task = {
@@ -118,7 +121,7 @@ export async function addTask(taskData) {
     completed: 0, // false
     deleted: 0, // false
     quadrant: taskData.quadrant || 1,
-    listId: taskData.listId || "today",
+    listId: taskData.listId,
     estimatedTime: taskData.estimatedTime || "",
     userId: taskData.userId || null, // 添加 userId 字段
     createdAt: new Date(),
@@ -165,7 +168,8 @@ export async function restoreTask(id) {
 }
 
 // 获取已删除的任务（收纳箱）
-export async function getDeletedTasks(listId = "today") {
+export async function getDeletedTasks(listId) {
+  if (!listId) throw new Error('listId is required');
   const db = await initDB();
   const allTasks = await db.getAllFromIndex(STORES.TASKS, "listId", listId);
 
@@ -347,6 +351,7 @@ export async function getTaskList(id) {
 
 // 直接插入任务（不生成新ID，使用传入的完整数据）
 export async function insertTask(taskData) {
+  if (!taskData.listId) throw new Error('listId is required');
   const db = await openDB(DB_NAME, DB_VERSION);
   
   // 确保必要字段存在
@@ -356,7 +361,7 @@ export async function insertTask(taskData) {
     completed: taskData.completed || 0,
     deleted: taskData.deleted || 0,
     quadrant: taskData.quadrant || 1,
-    listId: taskData.listId || "today",
+    listId: taskData.listId,
     estimatedTime: taskData.estimatedTime || "",
     order: taskData.order || 0,
     userId: taskData.userId || null, // 添加 userId 字段

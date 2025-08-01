@@ -19,7 +19,7 @@ export const useTaskStore = create((set, get) => ({
   tasks: initialTasksState,
   loading: false,
   error: null,
-  currentListId: 'today',
+  currentListId: null,
   hasInitialized: false,
   
   // 批量操作队列（性能优化）
@@ -48,7 +48,8 @@ export const useTaskStore = create((set, get) => ({
   },
 
   // 加载任务
-  loadTasks: async (listId = 'today', forceLoading = false) => {
+  loadTasks: async (listId, forceLoading = false) => {
+    if (!listId) throw new Error('listId is required');
     try {
       const state = get();
       
@@ -514,7 +515,7 @@ export const useTaskStore = create((set, get) => ({
       tasks: initialTasksState,
       loading: false,
       error: null,
-      currentListId: 'today',
+      currentListId: null,
       pendingUpdates: [],
       updateTimeoutId: null
     });
